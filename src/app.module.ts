@@ -5,7 +5,7 @@ import { PortfolioModule } from './portfolio/portfolio.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { User } from './auth/user.entity';
+import { User } from './auth/entities/user.entity';
 import { JwtStrategy } from './auth/jwt.strategy';
 import { UsersRepository } from './auth/users.repository';
 

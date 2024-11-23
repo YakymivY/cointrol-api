@@ -8,6 +8,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from './auth/entities/user.entity';
 import { JwtStrategy } from './auth/jwt.strategy';
 import { UsersRepository } from './auth/users.repository';
+import { TransactionsModule } from './transactions/transactions.module';
+import { Portfolio } from './portfolio/entities/portfolio.entity';
+import { Transaction } from './transactions/entities/transaction.entity';
 
 @Module({
   imports: [
@@ -25,7 +28,7 @@ import { UsersRepository } from './auth/users.repository';
           type: 'postgres',
           autoLoadEntities: true,
           synchronize: true,
-          entities: [User],
+          entities: [User, Portfolio, Transaction],
           host: configService.get<string>('DB_HOST'),
           port: configService.get<number>('DB_PORT'),
           username: configService.get<string>('DB_USERNAME'),
@@ -34,6 +37,7 @@ import { UsersRepository } from './auth/users.repository';
         };
       },
     }),
+    TransactionsModule,
   ],
   controllers: [AppController],
   providers: [AppService, JwtStrategy, UsersRepository],

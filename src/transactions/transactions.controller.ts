@@ -11,6 +11,7 @@ export class TransactionsController {
   constructor(private transactionsService: TransactionsService) {}
 
   @Post('new')
+  //create a new transaction
   async addTransaction(
     @GetUser() user: User,
     @Body() addTransactionDto: AddTransactionDto,

@@ -1,7 +1,6 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Portfolio } from './entities/portfolio.entity';
 import { DataSource, Repository } from 'typeorm';
-import { PortfolioAssetDto } from './dto/portfolio-asset.dto';
 
 @Injectable()
 export class PortfolioRepository extends Repository<Portfolio> {
@@ -9,21 +8,21 @@ export class PortfolioRepository extends Repository<Portfolio> {
     super(Portfolio, dataSource.createEntityManager());
   }
 
-  async addAsset(portfolioAssetDto: PortfolioAssetDto): Promise<void> {
-    const { userId, asset, amount } = portfolioAssetDto;
+  // async addAsset(portfolioAssetDto: PortfolioAssetDto): Promise<void> {
+  //   const { userId, asset, amount } = portfolioAssetDto;
 
-    const portfolioAsset = this.create({
-      userId,
-      asset,
-      amount,
-    });
+  //   const portfolioAsset = this.create({
+  //     userId,
+  //     asset,
+  //     amount,
+  //   });
 
-    try {
-      await this.save(portfolioAsset);
-    } catch (error) {
-      throw new InternalServerErrorException(
-        `Failed to add asset to the portfolio: ${error}`,
-      );
-    }
-  }
+  //   try {
+  //     await this.save(portfolioAsset);
+  //   } catch (error) {
+  //     throw new InternalServerErrorException(
+  //       `Failed to add asset to the portfolio: ${error}`,
+  //     );
+  //   }
+  // }
 }

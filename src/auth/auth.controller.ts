@@ -13,6 +13,7 @@ export class AuthController {
   }
 
   @Post('/login')
+  //login and get token
   loginUser(@Body() loginUserDto: AuthUserDto): Promise<{ token: string }> {
     return this.authService.loginUser(loginUserDto);
   }

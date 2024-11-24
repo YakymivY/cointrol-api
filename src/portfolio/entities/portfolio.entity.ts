@@ -10,4 +10,7 @@ export class Portfolio {
 
   @Column('decimal', { precision: 20, scale: 8 })
   amount: number;
+
+  @Column('decimal', { precision: 18, scale: 8 })
+  averageEntryPrice: number;
 }

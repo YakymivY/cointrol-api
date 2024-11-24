@@ -19,6 +19,7 @@ export class TransactionsService {
     user: User,
   ): Promise<void> {
     this.transactionRepository.createTransaction(addTransactionDto, user);
+    //update user portfolio data after transaction
     await this.updatePortfolio(
       user.id,
       addTransactionDto.asset,
@@ -33,10 +34,12 @@ export class TransactionsService {
     amount: number,
     price: number,
   ): Promise<void> {
+    //get the asset used in the transaction
     const portfolioAsset = await this.portfolioRepository.findOne({
       where: { userId, asset },
     });
 
+    //there is no asset in the database for the user
     if (!portfolioAsset) {
       if (amount < 0) {
         throw new NotFoundException(
@@ -44,10 +47,12 @@ export class TransactionsService {
         );
       }
 
+      //create a new asset record fot the user
       await this.portfolioRepository.save({
         userId,
         asset,
         amount,
+        averateEntryPrice: price,
       });
     } else {
       //update amount
@@ -60,6 +65,7 @@ export class TransactionsService {
         throw new Error('Insufficient assets to complete the transaction.');
       }
 
+      //save updated asset info
       await this.portfolioRepository.save(portfolioAsset);
     }
   }

@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { AuthUserDto } from './dto/auth-user.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UsersRepository } from './users.repository';
@@ -8,6 +8,7 @@ import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class AuthService {
+  private logger = new Logger(AuthService.name);
   constructor(
     @InjectRepository(UsersRepository)
     private usersRepository: UsersRepository,
@@ -23,10 +24,13 @@ export class AuthService {
 
     const user = await this.usersRepository.findOne({ where: { email } });
     if (user && (await bcrypt.compare(password, user.password))) {
-      const payload: JwtPayload = { email };
+      //user exists and password is correct
+      const payload: JwtPayload = { email }; //create token payload
       const token: string = await this.jwtService.sign(payload);
       return { token };
     } else {
+      //no user or wrong password
+      this.logger.error('Wrong login credentials.');
       throw new UnauthorizedException('Please check your login credentials.');
     }
   }

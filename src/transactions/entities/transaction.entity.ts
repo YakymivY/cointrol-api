@@ -18,4 +18,7 @@ export class Transaction {
 
   @Column('decimal', { precision: 18, scale: 8 })
   price: number;
+
+  @Column('timestamp')
+  timestamp: Date;
 }

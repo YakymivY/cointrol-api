@@ -19,15 +19,16 @@ export class TransactionsRepository extends Repository<Transaction> {
     addTransactionDto: AddTransactionDto,
     user: User,
   ): Promise<void> {
-    const { asset, amount, price } = addTransactionDto;
+    const { asset, amount, price, timestamp } = addTransactionDto;
 
-    const tx = this.create({
-      userId: user.id,
-      asset,
-      amount,
-      price,
-    });
     try {
+      const tx = this.create({
+        userId: user.id,
+        asset,
+        amount,
+        price,
+        timestamp: timestamp ? new Date(timestamp) : new Date(),
+      });
       await this.save(tx);
     } catch (error) {
       this.logger.error(

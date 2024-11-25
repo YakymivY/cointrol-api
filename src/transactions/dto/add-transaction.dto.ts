@@ -1,4 +1,11 @@
-import { IsNotEmpty, IsNumber, IsPositive, IsString } from 'class-validator';
+import {
+  IsDateString,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsPositive,
+  IsString,
+} from 'class-validator';
 
 export class AddTransactionDto {
   @IsNotEmpty()
@@ -13,4 +20,8 @@ export class AddTransactionDto {
   @IsNumber()
   @IsPositive()
   price: number;
+
+  @IsOptional()
+  @IsDateString()
+  timestamp?: string;
 }

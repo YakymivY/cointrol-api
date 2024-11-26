@@ -6,7 +6,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { TransactionsRepository } from './transactions.repository';
 import { Transaction } from './entities/transaction.entity';
 import { PortfolioModule } from 'src/portfolio/portfolio.module';
-import { PortfolioRepository } from 'src/portfolio/portfolio.repository';
+import { PortfolioRepository } from 'src/portfolio/repositories/portfolio.repository';
 
 @Module({
   imports: [

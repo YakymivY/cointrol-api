@@ -1,4 +1,4 @@
-import { PortfolioRepository } from './../portfolio/portfolio.repository';
+import { PortfolioRepository } from './../portfolio/repositories/portfolio.repository';
 import {
   Injectable,
   InternalServerErrorException,
@@ -70,6 +70,15 @@ export class TransactionsService {
           averageEntryPrice: price,
         });
       } else {
+        //update average price
+        if (amount > 0) {
+          const total: number =
+            portfolioAsset.amount * portfolioAsset.averageEntryPrice;
+          const updatedAverage: number =
+            (total + amount * price) / (portfolioAsset.amount + amount);
+          portfolioAsset.averageEntryPrice = updatedAverage;
+        }
+
         //update amount
         portfolioAsset.amount =
           parseFloat(portfolioAsset.amount.toString()) +

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Portfolio } from './entities/portfolio.entity';
+import { Portfolio } from '../entities/portfolio.entity';
 import { DataSource, Repository } from 'typeorm';
 
 @Injectable()

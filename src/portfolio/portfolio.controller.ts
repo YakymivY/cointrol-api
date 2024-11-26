@@ -1,10 +1,21 @@
-import { Controller, Get, Logger, Param, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Logger,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { PortfolioService } from './portfolio.service';
 import { ExchangeRateResponse } from './interfaces/exchange-rate.interface';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import { User } from 'src/auth/entities/user.entity';
 import { AuthGuard } from '@nestjs/passport';
 import { PortfolioData } from './interfaces/portfolio-data.interface';
+import { FundsOperationDto } from './dto/funds-operation.dto';
+import { Balance } from './entities/balance.entity';
+import { BalanceResponse } from './interfaces/balance-response.interface';
 
 @Controller('portfolio')
 @UseGuards(AuthGuard())
@@ -25,6 +36,30 @@ export class PortfolioController {
   getPortfolioData(@GetUser() user: User): Promise<PortfolioData> {
     this.logger.verbose(`Getting portfolio data for user ${user.id}.`);
     return this.portfolioService.getPortfolio(user.id);
+  }
+
+  @Post('/deposit')
+  //deposit funds to crypto
+  depositFunds(
+    @GetUser() user: User,
+    @Body() depositDto: FundsOperationDto,
+  ): Promise<void> {
+    return this.portfolioService.depositFunds(depositDto, user.id);
+  }
+
+  @Post('/withdraw')
+  //withdraw funds from crypto
+  withdrawFunds(
+    @GetUser() user: User,
+    @Body() withdrawDto: FundsOperationDto,
+  ): Promise<void> {
+    return this.portfolioService.withdrawFunds(withdrawDto, user.id);
+  }
+
+  @Get('/balance')
+  //get balance of user
+  getUserBalance(@GetUser() user: User): Promise<BalanceResponse | null> {
+    return this.portfolioService.getUserBalance(user.id);
   }
 
   //optional

@@ -113,10 +113,8 @@ export class PortfolioService {
       });
     } else {
       //update existing balance
-      balance.balance =
-        parseFloat(balance.balance.toString()) + parseFloat(amount.toString());
-      balance.deposit =
-        parseFloat(balance.deposit.toString()) + parseFloat(amount.toString());
+      balance.balance = balance.balance + amount;
+      balance.deposit = balance.deposit + amount;
     }
 
     //save to the database
@@ -149,10 +147,8 @@ export class PortfolioService {
       );
     } else {
       //update balance and withdraw amount
-      balance.balance =
-        parseFloat(balance.balance.toString()) - parseFloat(amount.toString());
-      balance.withdraw =
-        parseFloat(balance.withdraw.toString()) + parseFloat(amount.toString());
+      balance.balance = balance.balance - amount;
+      balance.withdraw = balance.withdraw + amount;
     }
 
     //save to the database

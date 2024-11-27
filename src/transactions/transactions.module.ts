@@ -7,6 +7,7 @@ import { TransactionsRepository } from './transactions.repository';
 import { Transaction } from './entities/transaction.entity';
 import { PortfolioModule } from 'src/portfolio/portfolio.module';
 import { PortfolioRepository } from 'src/portfolio/repositories/portfolio.repository';
+import { BalanceRepository } from 'src/portfolio/repositories/balance.repository';
 
 @Module({
   imports: [
@@ -15,6 +16,11 @@ import { PortfolioRepository } from 'src/portfolio/repositories/portfolio.reposi
     PortfolioModule,
   ],
   controllers: [TransactionsController],
-  providers: [TransactionsService, TransactionsRepository, PortfolioRepository],
+  providers: [
+    TransactionsService,
+    TransactionsRepository,
+    PortfolioRepository,
+    BalanceRepository,
+  ],
 })
 export class TransactionsModule {}

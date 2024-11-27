@@ -14,7 +14,6 @@ import { User } from 'src/auth/entities/user.entity';
 import { AuthGuard } from '@nestjs/passport';
 import { PortfolioData } from './interfaces/portfolio-data.interface';
 import { FundsOperationDto } from './dto/funds-operation.dto';
-import { Balance } from './entities/balance.entity';
 import { BalanceResponse } from './interfaces/balance-response.interface';
 
 @Controller('portfolio')

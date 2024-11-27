@@ -1,5 +1,6 @@
 import { PortfolioRepository } from './../portfolio/repositories/portfolio.repository';
 import {
+  BadRequestException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -11,6 +12,8 @@ import { AddTransactionDto } from './dto/add-transaction.dto';
 import { User } from 'src/auth/entities/user.entity';
 import { TransactionInterface } from './interfaces/transaction.interface';
 import { TransactionType } from 'src/shared/enums/transaction-type.enum';
+import { BalanceRepository } from 'src/portfolio/repositories/balance.repository';
+import { Balance } from 'src/portfolio/entities/balance.entity';
 
 @Injectable()
 export class TransactionsService {
@@ -20,6 +23,8 @@ export class TransactionsService {
     private transactionRepository: TransactionsRepository,
     @InjectRepository(PortfolioRepository)
     private portfolioRepository: PortfolioRepository,
+    @InjectRepository(BalanceRepository)
+    private balanceRepository: BalanceRepository,
   ) {}
 
   async addTransaction(
@@ -27,15 +32,43 @@ export class TransactionsService {
     user: User,
   ): Promise<void> {
     const { asset, amount, price } = addTransactionDto;
+    const total: number = amount * price;
     try {
-      this.transactionRepository.createTransaction(addTransactionDto, user);
+      const userBalance: Balance =
+        await this.balanceRepository.findBalanceOfUser(user.id);
+      //insufficient balance to buy tokens
+      if (amount > 0 && total > userBalance.balance) {
+        this.logger.error(
+          `Transaction denied: Insufficient balance. User balance: ${userBalance.balance}, Transaction cost: ${total}`,
+        );
+        throw new BadRequestException(
+          `Insufficient balance. You need ${total} but only have ${userBalance.balance}.`,
+        );
+      }
+      //save tx in database
+      await this.transactionRepository.createTransaction(
+        addTransactionDto,
+        user,
+      );
+      this.logger.log(
+        `Transaction created successfully for user ${user.id} - Asset: ${asset}, Amount: ${amount}, Price: ${price}.`,
+      );
 
       //update user portfolio data after transaction
       await this.updatePortfolio(user.id, asset, amount, price);
+      this.logger.log(`Portfolio updated successfully for user ${user.id}.`);
+
+      //update balance of user
+      await this.updateBalance(user.id, amount * price);
+      this.logger.log(`Balance updated successfully for user ${user.id}`);
     } catch (error) {
       this.logger.error(
         `Failed to add transaction for user ${user.id}. Error: ${error.message}`,
       );
+      //rethrow error if it's already a recognized exception
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
       throw new InternalServerErrorException(
         'An error occured while processing the transaction.',
       );
@@ -71,18 +104,17 @@ export class TransactionsService {
         });
       } else {
         //update average price
+        this.logger.debug(typeof amount, typeof price);
         if (amount > 0) {
           const total: number =
             portfolioAsset.amount * portfolioAsset.averageEntryPrice;
           const updatedAverage: number =
-            (total + amount * price) / (portfolioAsset.amount + amount);
+            total + (amount * price) / (portfolioAsset.amount + amount);
           portfolioAsset.averageEntryPrice = updatedAverage;
         }
 
         //update amount
-        portfolioAsset.amount =
-          parseFloat(portfolioAsset.amount.toString()) +
-          parseFloat(amount.toString());
+        portfolioAsset.amount = portfolioAsset.amount + amount;
 
         //ensure amount do not go negative
         if (portfolioAsset.amount < 0) {
@@ -99,6 +131,23 @@ export class TransactionsService {
       );
       throw new InternalServerErrorException(
         'An error occurred while updating the portfolio.',
+      );
+    }
+  }
+
+  async updateBalance(userId: string, balanceChange: number): Promise<void> {
+    try {
+      const userBalance =
+        await this.balanceRepository.findBalanceOfUser(userId);
+      userBalance.balance = userBalance.balance - balanceChange;
+
+      await this.balanceRepository.saveBalance(userBalance);
+    } catch (error) {
+      this.logger.error(
+        `Failed to update balance for user ${userId}. Error: ${error.message}`,
+      );
+      throw new InternalServerErrorException(
+        'An error occured while updating the balance.',
       );
     }
   }

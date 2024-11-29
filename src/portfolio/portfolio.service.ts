@@ -61,7 +61,7 @@ export class PortfolioService {
     const assetsAmount: PortfolioAssetAmount[] =
       await this.portfolioRepository.find({
         where: { userId },
-        select: ['asset', 'amount'],
+        select: ['asset', 'amount', 'averageEntryPrice'],
       });
 
     //adding additional data for each asset
@@ -74,6 +74,7 @@ export class PortfolioService {
           amount: item.amount,
           price,
           total,
+          average: item.averageEntryPrice,
         };
         //add to portfolio assets
         portfolioData.assets.push(assetObj);

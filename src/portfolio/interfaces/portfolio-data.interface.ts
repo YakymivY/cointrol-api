@@ -8,9 +8,11 @@ export interface PortfolioAsset {
   amount: number;
   price: number;
   total: number;
+  average: number;
 }
 
 export interface PortfolioAssetAmount {
   asset: string;
   amount: number;
+  averageEntryPrice: number;
 }

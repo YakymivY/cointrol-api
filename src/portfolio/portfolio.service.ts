@@ -36,9 +36,12 @@ export class PortfolioService {
 
   async fetchExchangeRate(asset: string): Promise<ExchangeRateResponse> {
     //composing external api url
-    const url: string = `${this.env.get<string>('COINAPI_URL')}/exchangerate/${asset}/USDT?apikey=${this.env.get<string>('COINAPI_KEY')}`;
+    const url: string = `${this.env.get<string>('COINAPI_URL')}/exchangerate/${asset}/USDT`;
+    const headers = {
+      'X-CoinAPI-Key': this.env.get<string>('COINAPI_KEY'),
+    };
     try {
-      const response = await lastValueFrom(this.http.get(url));
+      const response = await lastValueFrom(this.http.get(url, { headers }));
       return response.data;
     } catch (error) {
       throw new Error(`Failed to fetch exchange rate: ${error.message}`);
@@ -69,12 +72,18 @@ export class PortfolioService {
       try {
         const price: number = (await this.fetchExchangeRate(item.asset)).rate;
         const total: number = price * item.amount;
+        const totalSpent = item.averageEntryPrice * item.amount;
+        const pnl: number = total - totalSpent;
+        const pnlPercent: number = (pnl / totalSpent) * 100;
         const assetObj: PortfolioAsset = {
           asset: item.asset,
           amount: item.amount,
           price,
           total,
           average: item.averageEntryPrice,
+          totalSpent,
+          pnl,
+          pnlPercent,
         };
         //add to portfolio assets
         portfolioData.assets.push(assetObj);

@@ -9,6 +9,9 @@ export interface PortfolioAsset {
   price: number;
   total: number;
   average: number;
+  totalSpent: number;
+  pnl: number;
+  pnlPercent: number;
 }
 
 export interface PortfolioAssetAmount {

@@ -9,6 +9,8 @@ import {
 import { ConfigService } from '@nestjs/config';
 import * as WebSocket from 'ws';
 import { ExratePayload } from './interfaces/exrate-payload.interface';
+import { exrateMessage } from './interfaces/exrate-message.interface';
+import { wsMessageType } from '../enums/ws-message-type.enum';
 
 @Injectable()
 export class WebsocketService implements OnModuleInit, OnModuleDestroy {
@@ -69,7 +71,7 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  sendMessage(data: any) {
+  sendMessage(data: any): void {
     if (this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(data));
     } else {
@@ -77,7 +79,23 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  updateExchangeRates(payload: ExratePayload) {
+  addAssetMessage(assets: string[], type: wsMessageType): void {
+    //add usdt quote to each asset
+    const quotedAssets: string[] = assets.map(
+      (item) => (item = `${item}/USDT`),
+    );
+    //create request message
+    const messagePayload: exrateMessage = {
+      type,
+      heartbeat: true,
+      subscribe_data_type: ['exrate'],
+      subscribe_filter_asset_id: quotedAssets,
+      subscribe_update_limit_ms_exrate: 5000,
+    };
+    this.sendMessage(messagePayload);
+  }
+
+  updateExchangeRates(payload: ExratePayload): void {
     const { asset_id_base, rate } = payload;
 
     //load rates into cache with time-to-leave of 30sec

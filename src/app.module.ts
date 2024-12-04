@@ -14,6 +14,7 @@ import { Transaction } from './transactions/entities/transaction.entity';
 import { WebsocketModule } from './shared/websocket/websocket.module';
 import { CacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-redis-yet';
+import { GatewayModule } from './shared/gateway/gateway.module';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { redisStore } from 'cache-manager-redis-yet';
     }),
     TransactionsModule,
     WebsocketModule,
+    GatewayModule,
   ],
   controllers: [AppController],
   providers: [AppService, JwtStrategy, UsersRepository],

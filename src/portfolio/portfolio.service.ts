@@ -1,5 +1,4 @@
 import { PortfolioRepository } from './repositories/portfolio.repository';
-import { HttpService } from '@nestjs/axios';
 import {
   Inject,
   Injectable,
@@ -8,8 +7,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { lastValueFrom } from 'rxjs';
-import { ExchangeRateResponse } from './interfaces/exchange-rate.interface';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   PortfolioAsset,
@@ -21,12 +18,14 @@ import { BalanceRepository } from './repositories/balance.repository';
 import { UsersRepository } from 'src/auth/users.repository';
 import { BalanceResponse } from './interfaces/balance-response.interface';
 import { Cache } from '@nestjs/cache-manager';
+import { WebsocketService } from 'src/shared/websocket/websocket.service';
+import { wsMessageType } from 'src/shared/enums/ws-message-type.enum';
 
 @Injectable()
 export class PortfolioService {
   private logger = new Logger(PortfolioService.name);
   constructor(
-    private readonly http: HttpService,
+    private readonly wsService: WebsocketService,
     private env: ConfigService,
     @InjectRepository(PortfolioRepository)
     private readonly portfolioRepository: PortfolioRepository,
@@ -37,19 +36,19 @@ export class PortfolioService {
     @Inject('CACHE_MANAGER') private cacheManager: Cache,
   ) {}
 
-  async fetchExchangeRate(asset: string): Promise<ExchangeRateResponse> {
-    //composing external api url
-    const url: string = `${this.env.get<string>('COINAPI_URL')}/exchangerate/${asset}/USDT`;
-    const headers = {
-      'X-CoinAPI-Key': this.env.get<string>('COINAPI_KEY'),
-    };
-    try {
-      const response = await lastValueFrom(this.http.get(url, { headers }));
-      return response.data;
-    } catch (error) {
-      throw new Error(`Failed to fetch exchange rate: ${error.message}`);
-    }
-  }
+  // async fetchExchangeRate(asset: string): Promise<ExchangeRateResponse> {
+  //   //composing external api url
+  //   const url: string = `${this.env.get<string>('COINAPI_URL')}/exchangerate/${asset}/USDT`;
+  //   const headers = {
+  //     'X-CoinAPI-Key': this.env.get<string>('COINAPI_KEY'),
+  //   };
+  //   try {
+  //     const response = await lastValueFrom(this.http.get(url, { headers }));
+  //     return response.data;
+  //   } catch (error) {
+  //     throw new Error(`Failed to fetch exchange rate: ${error.message}`);
+  //   }
+  // }
 
   // async addAsset(portfolioAssetDto: PortfolioAssetDto): Promise<void> {
   //   return this.portfolioRepository.addAsset(portfolioAssetDto);
@@ -63,22 +62,35 @@ export class PortfolioService {
       assets: [],
     };
 
-    //get amount from db
-    const assetsAmount: PortfolioAssetAmount[] =
-      await this.portfolioRepository.find({
+    let assetsAmount: PortfolioAssetAmount[] | null =
+      await this.cacheManager.get(`portfolio:${userId}`);
+    if (!assetsAmount) {
+      //get amount from db
+      this.logger.debug('Fetching data from db');
+      assetsAmount = await this.portfolioRepository.find({
         where: { userId },
         select: ['asset', 'amount', 'averageEntryPrice'],
       });
 
-    //TODO send assets list to add to tracklist
+      //TODO send assets list to add to tracklist ?
 
-    //writing users portfolio data into cache with time-to-live of 1h
-    this.cacheManager.set(`portfolio:${userId}`, assetsAmount, 3600000);
+      //writing users portfolio data into cache with time-to-live of 1h
+      this.cacheManager.set(`portfolio:${userId}`, assetsAmount, 3600000);
+    }
+
+    // ?????? pings every time
+    //start websocket exchange rate fetching
+    this.wsService.addAssetMessage(
+      assetsAmount.map((obj) => obj.asset),
+      wsMessageType.SUBSCRIBE,
+    );
 
     //adding additional data for each asset
     for (const item of assetsAmount) {
       try {
-        const price: number = (await this.fetchExchangeRate(item.asset)).rate;
+        const price: number = await this.cacheManager.get(
+          `exchangeRates:${item.asset}`,
+        );
         const total: number = price * item.amount;
         const totalSpent = item.averageEntryPrice * item.amount;
         const pnl: number = total - totalSpent;
@@ -96,10 +108,8 @@ export class PortfolioService {
         //add to portfolio assets
         portfolioData.assets.push(assetObj);
       } catch (error) {
-        this.logger.error(
-          `Failed to fetch exchange rate from external API: ${error.message}`,
-        );
-        throw new Error('Failed to fetch exchange rate');
+        this.logger.error(`Failed to update token data: ${error.message}`);
+        throw new Error('Failed to update portfolio data');
       }
     }
 

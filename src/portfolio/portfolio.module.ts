@@ -9,6 +9,7 @@ import { PortfolioRepository } from './repositories/portfolio.repository';
 import { Balance } from './entities/balance.entity';
 import { BalanceRepository } from './repositories/balance.repository';
 import { UsersRepository } from 'src/auth/users.repository';
+import { WebsocketService } from 'src/shared/websocket/websocket.service';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { UsersRepository } from 'src/auth/users.repository';
     PortfolioRepository,
     BalanceRepository,
     UsersRepository,
+    WebsocketService,
   ],
 })
 export class PortfolioModule {}

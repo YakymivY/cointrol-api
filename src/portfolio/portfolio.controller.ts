@@ -15,12 +15,16 @@ import { AuthGuard } from '@nestjs/passport';
 import { PortfolioData } from './interfaces/portfolio-data.interface';
 import { FundsOperationDto } from './dto/funds-operation.dto';
 import { BalanceResponse } from './interfaces/balance-response.interface';
+import { WebsocketService } from 'src/shared/websocket/websocket.service';
 
 @Controller('portfolio')
 @UseGuards(AuthGuard())
 export class PortfolioController {
   private logger = new Logger(PortfolioController.name);
-  constructor(private portfolioService: PortfolioService) {}
+  constructor(
+    private portfolioService: PortfolioService,
+    private websocketService: WebsocketService,
+  ) {}
 
   @Get('/exchange-rate/:asset')
   //fetch exchange rates from external API
@@ -70,4 +74,9 @@ export class PortfolioController {
   //   portfolioAssetDto.userId = user.id;
   //   return this.portfolioService.addAsset(portfolioAssetDto);
   // }
+
+  @Get('/websocket')
+  wsMessage(@Body() message: any) {
+    this.websocketService.sendMessage(message);
+  }
 }

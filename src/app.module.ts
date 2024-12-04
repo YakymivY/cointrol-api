@@ -11,6 +11,9 @@ import { UsersRepository } from './auth/users.repository';
 import { TransactionsModule } from './transactions/transactions.module';
 import { Portfolio } from './portfolio/entities/portfolio.entity';
 import { Transaction } from './transactions/entities/transaction.entity';
+import { WebsocketModule } from './shared/websocket/websocket.module';
+import { CacheModule } from '@nestjs/cache-manager';
+import { redisStore } from 'cache-manager-redis-yet';
 
 @Module({
   imports: [
@@ -37,7 +40,12 @@ import { Transaction } from './transactions/entities/transaction.entity';
         };
       },
     }),
+    CacheModule.register({
+      isGlobal: true,
+      store: redisStore,
+    }),
     TransactionsModule,
+    WebsocketModule,
   ],
   controllers: [AppController],
   providers: [AppService, JwtStrategy, UsersRepository],

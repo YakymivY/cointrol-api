@@ -1,6 +1,7 @@
 import { PortfolioRepository } from './repositories/portfolio.repository';
 import { HttpService } from '@nestjs/axios';
 import {
+  Inject,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -19,6 +20,7 @@ import { FundsOperationDto } from './dto/funds-operation.dto';
 import { BalanceRepository } from './repositories/balance.repository';
 import { UsersRepository } from 'src/auth/users.repository';
 import { BalanceResponse } from './interfaces/balance-response.interface';
+import { Cache } from '@nestjs/cache-manager';
 
 @Injectable()
 export class PortfolioService {
@@ -32,6 +34,7 @@ export class PortfolioService {
     private readonly balanceRepository: BalanceRepository,
     @InjectRepository(UsersRepository)
     private readonly usersRepository: UsersRepository,
+    @Inject('CACHE_MANAGER') private cacheManager: Cache,
   ) {}
 
   async fetchExchangeRate(asset: string): Promise<ExchangeRateResponse> {
@@ -66,6 +69,11 @@ export class PortfolioService {
         where: { userId },
         select: ['asset', 'amount', 'averageEntryPrice'],
       });
+
+    //TODO send assets list to add to tracklist
+
+    //writing users portfolio data into cache with time-to-live of 1h
+    this.cacheManager.set(`portfolio:${userId}`, assetsAmount, 3600000);
 
     //adding additional data for each asset
     for (const item of assetsAmount) {

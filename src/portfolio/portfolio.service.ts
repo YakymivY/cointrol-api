@@ -19,7 +19,6 @@ import { UsersRepository } from 'src/auth/users.repository';
 import { BalanceResponse } from './interfaces/balance-response.interface';
 import { Cache } from '@nestjs/cache-manager';
 import { WebsocketService } from 'src/shared/websocket/websocket.service';
-import { wsMessageType } from 'src/shared/enums/ws-message-type.enum';
 
 @Injectable()
 export class PortfolioService {
@@ -62,35 +61,17 @@ export class PortfolioService {
       assets: [],
     };
 
-    let assetsAmount: PortfolioAssetAmount[] | null =
-      await this.cacheManager.get(`portfolio:${userId}`);
-    if (!assetsAmount) {
-      //get amount from db
-      this.logger.debug('Fetching data from db');
-      assetsAmount = await this.portfolioRepository.find({
-        where: { userId },
-        select: ['asset', 'amount', 'averageEntryPrice'],
-      });
-
-      //TODO send assets list to add to tracklist ?
-
-      //writing users portfolio data into cache with time-to-live of 1h
-      this.cacheManager.set(`portfolio:${userId}`, assetsAmount, 3600000);
-    }
-
-    // ?????? pings every time
-    //start websocket exchange rate fetching
-    this.wsService.addAssetMessage(
-      assetsAmount.map((obj) => obj.asset),
-      wsMessageType.SUBSCRIBE,
-    );
+    //get asset amount either from db or from cache
+    const assetsAmount: PortfolioAssetAmount[] =
+      await this.getAssetAmount(userId);
 
     //adding additional data for each asset
     for (const item of assetsAmount) {
       try {
-        const price: number = await this.cacheManager.get(
-          `exchangeRates:${item.asset}`,
-        );
+        //wait for price to be fetched
+        const price: number = await this.fetchExrate(item);
+
+        //start composing object
         const total: number = price * item.amount;
         const totalSpent = item.averageEntryPrice * item.amount;
         const pnl: number = total - totalSpent;
@@ -114,6 +95,49 @@ export class PortfolioService {
     }
 
     return portfolioData;
+  }
+
+  async getAssetAmount(userId: string): Promise<PortfolioAssetAmount[]> {
+    let assetsAmount: PortfolioAssetAmount[] | null =
+      await this.cacheManager.get(`portfolio:${userId}`);
+    //no asset data stored in cache
+    if (!assetsAmount) {
+      //get amount from db
+      assetsAmount = await this.portfolioRepository.find({
+        where: { userId },
+        select: ['asset', 'amount', 'averageEntryPrice'],
+      });
+
+      //writing users portfolio data into cache with time-to-leave of 1h
+      this.cacheManager.set(`portfolio:${userId}`, assetsAmount, 3600000);
+
+      //add tokens to tracklist
+      const userAssets: string[] = assetsAmount.map((obj) => obj.asset);
+      this.wsService.addToTracklist(userAssets);
+    }
+    return assetsAmount;
+  }
+
+  async fetchExrate(item: PortfolioAssetAmount): Promise<number> {
+    let retries = 0;
+    const maxRetries = 50; // Limit retries
+    const retryDelay = 100; // 100 ms delay between retries
+    let price: number | null;
+    do {
+      price = await this.cacheManager.get(`exchangeRates:${item.asset}`);
+      if (price == null) {
+        retries++;
+        await new Promise((resolve) => setTimeout(resolve, retryDelay)); // Add delay between attempts
+      }
+    } while (price == null && retries < maxRetries);
+
+    if (price == null) {
+      throw new Error(
+        `Failed to fetch exchange rate for ${item.asset} after ${maxRetries} attempts.`,
+      );
+    }
+
+    return price;
   }
 
   async depositFunds(

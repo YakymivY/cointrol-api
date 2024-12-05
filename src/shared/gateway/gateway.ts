@@ -1,5 +1,5 @@
 import { SubscribeMessage } from '@nestjs/websockets';
-import { Logger } from '@nestjs/common';
+import { Inject, Logger } from '@nestjs/common';
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
@@ -8,6 +8,9 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { PortfolioService } from 'src/portfolio/portfolio.service';
+import { Cache } from '@nestjs/cache-manager';
+import { PortfolioAssetAmount } from 'src/portfolio/interfaces/portfolio-data.interface';
+import { WebsocketService } from '../websocket/websocket.service';
 
 @WebSocketGateway({ cors: true })
 export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -16,9 +19,14 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   //storing user ids
   private userConnections = new Map<string, Set<string>>();
+  //storing user intervalId to cancel
   private subscribedClients = new Map<string, NodeJS.Timeout>();
 
-  constructor(private portfolioService: PortfolioService) {}
+  constructor(
+    private portfolioService: PortfolioService,
+    private wsService: WebsocketService,
+    @Inject('CACHE_MANAGER') private cacheManager: Cache,
+  ) {}
 
   // when a client connects
   handleConnection(client: Socket): void {
@@ -53,12 +61,18 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         this.userConnections.delete(userId);
         this.logger.log(`User ${userId} has no active connections.`);
       }
+
+      //unsubscribe properly
+      this.unsubscribeFromPortfolioUpdates(userId);
     }
     this.logger.log(`Socket ${client.id} disconnected.`);
   }
 
   @SubscribeMessage('subscribe-portfolio-data')
-  handlePortfolioSubscription(client: Socket, payload: { userId: string }) {
+  async handlePortfolioSubscription(
+    client: Socket,
+    payload: { userId: string },
+  ) {
     const { userId } = payload;
 
     //check unsubscribed users
@@ -69,16 +83,11 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     //send portfolio data every 5 seconds
     if (!this.subscribedClients.has(userId)) {
-      const intervalId = setInterval(async () => {
-        const portfolioData = await this.portfolioService.getPortfolio(userId); //fetch portfolio data for the user
+      //just to start from execution not interval
+      this.sendPortfolioData(userId);
 
-        const sockets = this.userConnections.get(userId);
-        if (sockets) {
-          sockets.forEach((socketId) => {
-            const socket = this.server.sockets.sockets.get(socketId);
-            socket?.emit('portfolio-data', portfolioData);
-          });
-        }
+      const intervalId = setInterval(async () => {
+        this.sendPortfolioData(userId);
       }, 5000);
 
       this.subscribedClients.set(userId, intervalId);
@@ -87,14 +96,47 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('unsubscribe-portfolio-data')
-  handlePortfolioUnsubscription(client: Socket, payload: { userId: string }) {
+  async handlePortfolioUnsubscription(
+    client: Socket,
+    payload: { userId: string },
+  ) {
     const { userId } = payload;
 
+    this.unsubscribeFromPortfolioUpdates(userId);
+  }
+
+  async unsubscribeFromPortfolioUpdates(userId: string) {
     const intervalId = this.subscribedClients.get(userId);
     if (intervalId) {
+      //stop sending portfolio-data
       clearInterval(intervalId);
       this.subscribedClients.delete(userId);
+
+      //get user asssets from cache
+      const userAssetsData: PortfolioAssetAmount[] | null =
+        await this.cacheManager.get(`portfolio:${userId}`);
+      if (!userAssetsData) {
+        this.logger.warn('No assets have been removed from tracklist.');
+      }
+      //take array of assets
+      const userAssets: string[] = userAssetsData.map((item) => item.asset);
+      this.wsService.removeFromTracklist(userAssets);
+
+      //delete portfolio data from cache
+      this.cacheManager.del(`portfolio:${userId}`);
       this.logger.log(`User ${userId} unsubscribed from portfolio data.`);
+    }
+  }
+
+  async sendPortfolioData(userId: string) {
+    const portfolioData = await this.portfolioService.getPortfolio(userId); //fetch portfolio data for the user
+
+    const sockets = this.userConnections.get(userId);
+    if (sockets) {
+      sockets.forEach((socketId) => {
+        const socket = this.server.sockets.sockets.get(socketId);
+        socket?.emit('portfolio-data', portfolioData);
+      });
     }
   }
 }

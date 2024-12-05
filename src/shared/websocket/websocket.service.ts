@@ -16,6 +16,7 @@ import { wsMessageType } from '../enums/ws-message-type.enum';
 export class WebsocketService implements OnModuleInit, OnModuleDestroy {
   private ws: WebSocket;
   private logger = new Logger(WebsocketService.name);
+  private assetsTracklist = new Map<string, number>();
 
   constructor(
     private env: ConfigService,
@@ -101,6 +102,36 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
     //load rates into cache with time-to-leave of 30sec
     this.cacheManager.set(`exchangeRates:${asset_id_base}`, rate, 30000);
     this.logger.log(`Updated asset: ${asset_id_base} with rate: ${rate}`);
+  }
+
+  //tracklist methods
+  addToTracklist(userAssets: string[]) {
+    userAssets.forEach((asset) => {
+      if (this.assetsTracklist.has(asset)) {
+        //increment number of sunscribers
+        this.assetsTracklist.set(asset, this.assetsTracklist.get(asset)! + 1);
+      } else {
+        //create new record
+        this.assetsTracklist.set(asset, 1);
+        this.addAssetMessage([asset], wsMessageType.SUBSCRIBE);
+      }
+    });
+  }
+
+  removeFromTracklist(userAssets: string[]) {
+    userAssets.forEach((asset) => {
+      if (this.assetsTracklist.has(asset)) {
+        const currentCount: number = this.assetsTracklist.get(asset)! - 1;
+        if (currentCount == 0) {
+          //delete asset from tracklist
+          this.assetsTracklist.delete(asset);
+          this.addAssetMessage([asset], wsMessageType.UNSUBSCRIBE);
+        } else {
+          //decrement number of subscribers
+          this.assetsTracklist.set(asset, currentCount);
+        }
+      }
+    });
   }
 
   onModuleDestroy() {

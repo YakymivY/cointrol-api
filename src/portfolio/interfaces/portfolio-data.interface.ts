@@ -12,6 +12,7 @@ export interface PortfolioAsset {
   totalSpent: number;
   pnl: number;
   pnlPercent: number;
+  historicalData: { [key: string]: number };
 }
 
 export interface PortfolioAssetAmount {

@@ -19,6 +19,9 @@ import { UsersRepository } from 'src/auth/users.repository';
 import { BalanceResponse } from './interfaces/balance-response.interface';
 import { Cache } from '@nestjs/cache-manager';
 import { WebsocketService } from 'src/shared/websocket/websocket.service';
+import { ChangePeriod } from 'src/shared/enums/change-period.enum';
+import { lastValueFrom } from 'rxjs';
+import { HttpService } from '@nestjs/axios';
 
 @Injectable()
 export class PortfolioService {
@@ -26,6 +29,7 @@ export class PortfolioService {
   constructor(
     private readonly wsService: WebsocketService,
     private env: ConfigService,
+    private http: HttpService,
     @InjectRepository(PortfolioRepository)
     private readonly portfolioRepository: PortfolioRepository,
     @InjectRepository(BalanceRepository)
@@ -76,6 +80,8 @@ export class PortfolioService {
         const totalSpent = item.averageEntryPrice * item.amount;
         const pnl: number = total - totalSpent;
         const pnlPercent: number = (pnl / totalSpent) * 100;
+        const historicalData: { [key: string]: number } =
+          await this.getHistoricalData(item.asset);
         const assetObj: PortfolioAsset = {
           asset: item.asset,
           amount: item.amount,
@@ -85,6 +91,7 @@ export class PortfolioService {
           totalSpent,
           pnl,
           pnlPercent,
+          historicalData,
         };
         //add to portfolio assets
         portfolioData.assets.push(assetObj);
@@ -138,6 +145,67 @@ export class PortfolioService {
     }
 
     return price;
+  }
+
+  async getHistoricalData(asset: string): Promise<{ [key: string]: number }> {
+    const cacheKey: string = `historicalPrices:${asset}`;
+
+    //check if the data is in cache
+    let historicalData = await this.cacheManager.get<{ [key: string]: number }>(
+      cacheKey,
+    );
+
+    if (!historicalData) {
+      try {
+        //fetch prices from external API
+        const [price1h, price1d, price7d] = await Promise.all([
+          this.fetchHistoricalPrice(asset, ChangePeriod.ONE_HOUR),
+          this.fetchHistoricalPrice(asset, ChangePeriod.ONE_DAY),
+          this.fetchHistoricalPrice(asset, ChangePeriod.SEVEN_DAYS),
+        ]);
+
+        //create object and store in cache
+        historicalData = { '1h': price1h, '1d': price1d, '7d': price7d };
+        //set historical data in cache for 5min
+        await this.cacheManager.set(cacheKey, historicalData, 300000);
+      } catch (error) {
+        this.logger.error(
+          `Failed to fetch historical prices for ${asset}: ${error.message}`,
+        );
+        throw new Error('Historical data fetch failed');
+      }
+    }
+
+    return historicalData;
+  }
+
+  async fetchHistoricalPrice(
+    asset: string,
+    period: ChangePeriod,
+  ): Promise<number> {
+    const now = new Date();
+    now.setTime(now.getTime() - period);
+    const fetchDate: string = now.toISOString();
+
+    const url: string = `${this.env.get<string>('COINAPI_URL')}/exchangerate/${asset}/USDT/history`;
+    const headers = {
+      'X-CoinAPI-Key': this.env.get<string>('COINAPI_KEY'),
+    };
+    const params = {
+      period_id: '5SEC',
+      time_start: fetchDate,
+      limit: 1,
+    };
+    try {
+      const response = await lastValueFrom(
+        this.http.get(url, { headers, params }),
+      );
+      //extract price from whole object
+      const { rate_open } = response.data[0];
+      return rate_open;
+    } catch (error) {
+      throw new Error(`Failed to fetch exchange rate: ${error.message}`);
+    }
   }
 
   async depositFunds(

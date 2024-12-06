@@ -25,5 +25,6 @@ import { WebsocketService } from 'src/shared/websocket/websocket.service';
     UsersRepository,
     WebsocketService,
   ],
+  exports: [HttpModule],
 })
 export class PortfolioModule {}

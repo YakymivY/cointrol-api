@@ -5,8 +5,11 @@ import { WebsocketService } from '../websocket/websocket.service';
 import { PortfolioRepository } from 'src/portfolio/repositories/portfolio.repository';
 import { UsersRepository } from 'src/auth/users.repository';
 import { BalanceRepository } from 'src/portfolio/repositories/balance.repository';
+import { HttpModule } from '@nestjs/axios';
+import { PortfolioModule } from 'src/portfolio/portfolio.module';
 
 @Module({
+  imports: [HttpModule, PortfolioModule],
   providers: [
     WsGateway,
     WebsocketService,

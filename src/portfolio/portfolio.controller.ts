@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Logger, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Logger,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { PortfolioService } from './portfolio.service';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import { User } from 'src/auth/entities/user.entity';
@@ -24,6 +32,10 @@ export class PortfolioController {
   // ): Promise<ExchangeRateResponse> {
   //   return this.portfolioService.fetchExchangeRate(asset);
   // }
+  @Get('/test')
+  getHistoricalPrices(@Query('asset') asset: string) {
+    return this.portfolioService.getHistoricalData(asset);
+  }
 
   @Get('/data')
   //send full portfolio object with necessary data

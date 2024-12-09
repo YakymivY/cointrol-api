@@ -15,6 +15,8 @@ import { WebsocketModule } from './shared/websocket/websocket.module';
 import { CacheModule } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-redis-yet';
 import { GatewayModule } from './shared/gateway/gateway.module';
+import { Storage } from './transactions/entities/storage.entity';
+import { Balance } from './portfolio/entities/balance.entity';
 
 @Module({
   imports: [
@@ -31,8 +33,8 @@ import { GatewayModule } from './shared/gateway/gateway.module';
         return {
           type: 'postgres',
           autoLoadEntities: true,
-          synchronize: true,
-          entities: [User, Portfolio, Transaction],
+          synchronize: false,
+          entities: [User, Portfolio, Transaction, Balance, Storage],
           host: configService.get<string>('DB_HOST'),
           port: configService.get<number>('DB_PORT'),
           username: configService.get<string>('DB_USERNAME'),

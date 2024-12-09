@@ -22,6 +22,10 @@ export class AddTransactionDto {
   price: number;
 
   @IsOptional()
+  @IsString()
+  storage?: string;
+
+  @IsOptional()
   @IsDateString()
   timestamp?: string;
 }

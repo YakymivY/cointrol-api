@@ -3,10 +3,10 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
-import { Transaction } from './entities/transaction.entity';
+import { Transaction } from '../entities/transaction.entity';
 import { DataSource, Repository } from 'typeorm';
-import { AddTransactionDto } from './dto/add-transaction.dto';
 import { User } from 'src/auth/entities/user.entity';
+import { Storage } from '../entities/storage.entity';
 
 @Injectable()
 export class TransactionsRepository extends Repository<Transaction> {
@@ -16,17 +16,20 @@ export class TransactionsRepository extends Repository<Transaction> {
   }
 
   async createTransaction(
-    addTransactionDto: AddTransactionDto,
+    asset: string,
+    amount: number,
+    price: number,
     user: User,
+    storage?: Storage,
+    timestamp?: string,
   ): Promise<void> {
-    const { asset, amount, price, timestamp } = addTransactionDto;
-
     try {
       const tx = this.create({
         userId: user.id,
         asset,
         amount,
         price,
+        storage,
         timestamp: timestamp ? new Date(timestamp) : new Date(),
       });
       await this.save(tx);

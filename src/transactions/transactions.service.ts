@@ -7,13 +7,15 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { TransactionsRepository } from './transactions.repository';
+import { TransactionsRepository } from './repositories/transactions.repository';
 import { AddTransactionDto } from './dto/add-transaction.dto';
 import { User } from 'src/auth/entities/user.entity';
 import { TransactionInterface } from './interfaces/transaction.interface';
 import { TransactionType } from 'src/shared/enums/transaction-type.enum';
 import { BalanceRepository } from 'src/portfolio/repositories/balance.repository';
 import { Balance } from 'src/portfolio/entities/balance.entity';
+import { StorageRepository } from './repositories/storage.repository';
+import { Storage } from './entities/storage.entity';
 
 @Injectable()
 export class TransactionsService {
@@ -25,13 +27,15 @@ export class TransactionsService {
     private portfolioRepository: PortfolioRepository,
     @InjectRepository(BalanceRepository)
     private balanceRepository: BalanceRepository,
+    @InjectRepository(StorageRepository)
+    private storageRepository: StorageRepository,
   ) {}
 
   async addTransaction(
     addTransactionDto: AddTransactionDto,
     user: User,
   ): Promise<void> {
-    const { asset, amount, price } = addTransactionDto;
+    const { asset, amount, price, storage } = addTransactionDto;
     const total: number = amount * price;
     try {
       const userBalance: Balance =
@@ -45,17 +49,30 @@ export class TransactionsService {
           `Insufficient balance. You need ${total} but only have ${userBalance.balance}.`,
         );
       }
+      //get storage entity from db
+      let storageObject = null;
+      if (storage) {
+        storageObject = await this.storageRepository.findOne({
+          where: { name: storage },
+        });
+        if (!storageObject) {
+          this.logger.warn('Failed to find the storage in database');
+        }
+      }
       //save tx in database
       await this.transactionRepository.createTransaction(
-        addTransactionDto,
+        asset,
+        amount,
+        price,
         user,
+        storageObject,
       );
       this.logger.log(
         `Transaction created successfully for user ${user.id} - Asset: ${asset}, Amount: ${amount}, Price: ${price}.`,
       );
 
       //update user portfolio data after transaction
-      await this.updatePortfolio(user.id, asset, amount, price);
+      await this.updatePortfolio(user.id, asset, amount, price, storageObject);
       this.logger.log(`Portfolio updated successfully for user ${user.id}.`);
 
       //update balance of user
@@ -80,15 +97,18 @@ export class TransactionsService {
     asset: string,
     amount: number,
     price: number,
+    storage: Storage | null,
   ): Promise<void> {
     try {
       //get the asset used in the transaction
       const portfolioAsset = await this.portfolioRepository.findOne({
         where: { userId, asset },
+        relations: ['storages'],
       });
 
       //there is no asset in the database for the user
       if (!portfolioAsset) {
+        //no asset to sell
         if (amount < 0) {
           throw new NotFoundException(
             'Cannot sell asset that does not exist in the portfolio.',
@@ -101,16 +121,47 @@ export class TransactionsService {
           asset,
           amount,
           averageEntryPrice: price,
+          storages: [storage],
         });
       } else {
-        //update average price
-        this.logger.debug(typeof amount, typeof price);
         if (amount > 0) {
+          //user is buying
+          //update average price
           const total: number =
             portfolioAsset.amount * portfolioAsset.averageEntryPrice;
           const updatedAverage: number =
             total + (amount * price) / (portfolioAsset.amount + amount);
           portfolioAsset.averageEntryPrice = updatedAverage;
+
+          //update storages if needed
+          if (storage) {
+            //if new storage is not already in the list
+            if (
+              !portfolioAsset.storages.some((item) => item.id === storage.id)
+            ) {
+              portfolioAsset.storages.push(storage);
+            }
+          }
+        } else {
+          //user is selling
+          //remove tokens storage
+          if (storage) {
+            //if there is such storage
+            if (
+              portfolioAsset.storages.some((item) => item.id === storage.id)
+            ) {
+              portfolioAsset.storages = portfolioAsset.storages.filter(
+                (item) => item.id !== storage.id,
+              );
+            } else {
+              this.logger.error(
+                `Failed to remove storage of tokens. There is no such value: ${storage.name}`,
+              );
+              throw new Error(
+                'Provided storage was not found and could not be removed',
+              );
+            }
+          }
         }
 
         //update amount
@@ -119,6 +170,12 @@ export class TransactionsService {
         //ensure amount do not go negative
         if (portfolioAsset.amount < 0) {
           throw new Error('Insufficient assets to complete the transaction.');
+        } else if (portfolioAsset.amount == 0) {
+          //user sold all tokens
+          //remove record from portfolio
+          await this.portfolioRepository.remove(portfolioAsset);
+          this.logger.log(`Asset was successfully deleted from portfolio`);
+          return;
         }
 
         //save updated asset info

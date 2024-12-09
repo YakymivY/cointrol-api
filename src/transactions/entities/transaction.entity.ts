@@ -1,4 +1,12 @@
-import { Column, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  Index,
+  JoinTable,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+import { Storage } from './storage.entity';
 
 @Entity()
 export class Transaction {
@@ -32,6 +40,10 @@ export class Transaction {
     },
   })
   price: number;
+
+  @ManyToOne(() => Storage, { eager: true, nullable: true })
+  @JoinTable({ name: 'storageId' })
+  storage: Storage;
 
   @Column('timestamp')
   timestamp: Date;

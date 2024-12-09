@@ -1,4 +1,5 @@
-import { Column, Entity, PrimaryColumn } from 'typeorm';
+import { Storage } from 'src/transactions/entities/storage.entity';
+import { Column, Entity, JoinTable, ManyToMany, PrimaryColumn } from 'typeorm';
 
 @Entity()
 export class Portfolio {
@@ -27,4 +28,15 @@ export class Portfolio {
     },
   })
   averageEntryPrice: number;
+
+  @ManyToMany(() => Storage, { eager: true, nullable: true })
+  @JoinTable({
+    name: 'portfolio_storage',
+    joinColumns: [
+      { name: 'portfolio_userId', referencedColumnName: 'userId' },
+      { name: 'portfolio_asset', referencedColumnName: 'asset' },
+    ],
+    inverseJoinColumns: [{ name: 'storage_id', referencedColumnName: 'id' }],
+  })
+  storages: Storage[];
 }

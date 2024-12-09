@@ -1,3 +1,5 @@
+import { HistoricalData } from './historical-data.interface';
+
 export interface PortfolioData {
   userId: string;
   assets?: PortfolioAsset[];
@@ -12,7 +14,7 @@ export interface PortfolioAsset {
   totalSpent: number;
   pnl: number;
   pnlPercent: number;
-  historicalData: { [key: string]: number };
+  historicalData: HistoricalData;
 }
 
 export interface PortfolioAssetAmount {

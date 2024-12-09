@@ -22,6 +22,7 @@ import { WebsocketService } from 'src/shared/websocket/websocket.service';
 import { ChangePeriod } from 'src/shared/enums/change-period.enum';
 import { lastValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
+import { HistoricalData } from './interfaces/historical-data.interface';
 
 @Injectable()
 export class PortfolioService {
@@ -80,8 +81,10 @@ export class PortfolioService {
         const totalSpent = item.averageEntryPrice * item.amount;
         const pnl: number = total - totalSpent;
         const pnlPercent: number = (pnl / totalSpent) * 100;
-        const historicalData: { [key: string]: number } =
-          await this.getHistoricalData(item.asset);
+        const historicalData: HistoricalData = await this.getHistoricalData(
+          item.asset,
+          price,
+        );
         const assetObj: PortfolioAsset = {
           asset: item.asset,
           amount: item.amount,
@@ -147,13 +150,17 @@ export class PortfolioService {
     return price;
   }
 
-  async getHistoricalData(asset: string): Promise<{ [key: string]: number }> {
+  async getHistoricalData(
+    asset: string,
+    currentPrice: number,
+  ): Promise<HistoricalData> {
     const cacheKey: string = `historicalPrices:${asset}`;
 
     //check if the data is in cache
     let historicalData = await this.cacheManager.get<{ [key: string]: number }>(
       cacheKey,
     );
+    const historicalDataChange: HistoricalData = {};
 
     if (!historicalData) {
       try {
@@ -166,8 +173,18 @@ export class PortfolioService {
 
         //create object and store in cache
         historicalData = { '1h': price1h, '1d': price1d, '7d': price7d };
+
+        //calculate percentage change
+        for (const [key, historicalPrice] of Object.entries(historicalData)) {
+          const change =
+            ((currentPrice - historicalPrice) / historicalPrice) * 100;
+          historicalDataChange[key] = {
+            price: historicalPrice,
+            change: parseFloat(change.toFixed(2)),
+          };
+        }
         //set historical data in cache for 5min
-        await this.cacheManager.set(cacheKey, historicalData, 300000);
+        await this.cacheManager.set(cacheKey, historicalDataChange, 300000);
       } catch (error) {
         this.logger.error(
           `Failed to fetch historical prices for ${asset}: ${error.message}`,
@@ -176,7 +193,7 @@ export class PortfolioService {
       }
     }
 
-    return historicalData;
+    return historicalDataChange;
   }
 
   async fetchHistoricalPrice(

@@ -17,6 +17,7 @@ import { redisStore } from 'cache-manager-redis-yet';
 import { GatewayModule } from './shared/gateway/gateway.module';
 import { Storage } from './transactions/entities/storage.entity';
 import { Balance } from './portfolio/entities/balance.entity';
+import { History } from './portfolio/entities/history.entity';
 
 @Module({
   imports: [
@@ -34,7 +35,7 @@ import { Balance } from './portfolio/entities/balance.entity';
           type: 'postgres',
           autoLoadEntities: true,
           synchronize: false,
-          entities: [User, Portfolio, Transaction, Balance, Storage],
+          entities: [User, Portfolio, Transaction, Balance, Storage, History],
           host: configService.get<string>('DB_HOST'),
           port: configService.get<number>('DB_PORT'),
           username: configService.get<string>('DB_USERNAME'),

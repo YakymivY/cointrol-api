@@ -14,6 +14,8 @@ export interface PortfolioAsset {
   totalSpent: number;
   pnl: number;
   pnlPercent: number;
+  allTimePnl: number;
+  totalPnl: number;
   historicalData: HistoricalData;
 }
 
@@ -21,4 +23,5 @@ export interface PortfolioAssetAmount {
   asset: string;
   amount: number;
   averageEntryPrice: number;
+  allTimePnl: number;
 }

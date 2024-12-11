@@ -10,6 +10,7 @@ import { Balance } from './entities/balance.entity';
 import { BalanceRepository } from './repositories/balance.repository';
 import { UsersRepository } from 'src/auth/users.repository';
 import { WebsocketService } from 'src/shared/websocket/websocket.service';
+import { HistoryRepository } from './repositories/history.repository';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { WebsocketService } from 'src/shared/websocket/websocket.service';
     BalanceRepository,
     UsersRepository,
     WebsocketService,
+    HistoryRepository,
   ],
   exports: [HttpModule],
 })

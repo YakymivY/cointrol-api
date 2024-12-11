@@ -1,9 +1,17 @@
 import { Storage } from 'src/transactions/entities/storage.entity';
-import { Column, Entity, JoinTable, ManyToMany, PrimaryColumn } from 'typeorm';
+import {
+  Column,
+  Entity,
+  JoinTable,
+  ManyToMany,
+  OneToOne,
+  PrimaryColumn,
+} from 'typeorm';
+import { History } from './history.entity';
 
 @Entity()
 export class Portfolio {
-  @PrimaryColumn()
+  @PrimaryColumn({ type: 'uuid' })
   userId: string;
 
   @PrimaryColumn()
@@ -39,4 +47,7 @@ export class Portfolio {
     inverseJoinColumns: [{ name: 'storage_id', referencedColumnName: 'id' }],
   })
   storages: Storage[];
+
+  @OneToOne(() => History, (history) => history.portfolio)
+  history: History;
 }

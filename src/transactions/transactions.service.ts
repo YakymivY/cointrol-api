@@ -1,3 +1,4 @@
+import { HistoryRepository } from './../portfolio/repositories/history.repository';
 import { PortfolioRepository } from './../portfolio/repositories/portfolio.repository';
 import {
   BadRequestException,
@@ -16,6 +17,7 @@ import { BalanceRepository } from 'src/portfolio/repositories/balance.repository
 import { Balance } from 'src/portfolio/entities/balance.entity';
 import { StorageRepository } from './repositories/storage.repository';
 import { Storage } from './entities/storage.entity';
+import { History } from 'src/portfolio/entities/history.entity';
 
 @Injectable()
 export class TransactionsService {
@@ -29,6 +31,8 @@ export class TransactionsService {
     private balanceRepository: BalanceRepository,
     @InjectRepository(StorageRepository)
     private storageRepository: StorageRepository,
+    @InjectRepository(HistoryRepository)
+    private historyRepository: HistoryRepository,
   ) {}
 
   async addTransaction(
@@ -115,14 +119,22 @@ export class TransactionsService {
           );
         }
 
-        //create a new asset record fot the user
-        await this.portfolioRepository.save({
-          userId,
-          asset,
-          amount,
-          averageEntryPrice: price,
-          storages: [storage],
-        });
+        //create new history record and a new asset record for the user
+        await this.historyRepository.manager.transaction(
+          async (transactionalEntityManager) => {
+            await transactionalEntityManager.save(History, {
+              userId,
+              asset,
+            });
+            await this.portfolioRepository.save({
+              userId,
+              asset,
+              amount,
+              averageEntryPrice: price,
+              storages: [storage],
+            });
+          },
+        );
       } else {
         if (amount > 0) {
           //user is buying
@@ -130,7 +142,7 @@ export class TransactionsService {
           const total: number =
             portfolioAsset.amount * portfolioAsset.averageEntryPrice;
           const updatedAverage: number =
-            total + (amount * price) / (portfolioAsset.amount + amount);
+            (total + amount * price) / (portfolioAsset.amount + amount);
           portfolioAsset.averageEntryPrice = updatedAverage;
 
           //update storages if needed
@@ -162,6 +174,16 @@ export class TransactionsService {
               );
             }
           }
+
+          // update all-time pnl in history
+          const historyRecord = await this.historyRepository.findOne({
+            where: { userId, asset },
+          });
+          const realizedPnl: number =
+            Math.abs(amount) * (price - portfolioAsset.averageEntryPrice);
+          historyRecord.allTimePnl = historyRecord.allTimePnl + realizedPnl;
+          await this.historyRepository.save(historyRecord);
+          this.logger.log(`History pnl successfully updated by ${realizedPnl}`);
         }
 
         //update amount

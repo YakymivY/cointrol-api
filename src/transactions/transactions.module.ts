@@ -10,6 +10,7 @@ import { PortfolioRepository } from 'src/portfolio/repositories/portfolio.reposi
 import { BalanceRepository } from 'src/portfolio/repositories/balance.repository';
 import { StorageRepository } from './repositories/storage.repository';
 import { Storage } from './entities/storage.entity';
+import { HistoryRepository } from 'src/portfolio/repositories/history.repository';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { Storage } from './entities/storage.entity';
     PortfolioRepository,
     BalanceRepository,
     StorageRepository,
+    HistoryRepository,
   ],
 })
 export class TransactionsModule {}

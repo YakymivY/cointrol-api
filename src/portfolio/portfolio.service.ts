@@ -68,7 +68,7 @@ export class PortfolioService {
 
     //get asset amount either from db or from cache
     const assetsAmount: PortfolioAssetAmount[] =
-      await this.getAssetAmount(userId);
+      await this.getAssetStaticData(userId);
 
     //adding additional data for each asset
     for (const item of assetsAmount) {
@@ -81,6 +81,7 @@ export class PortfolioService {
         const totalSpent = item.averageEntryPrice * item.amount;
         const pnl: number = total - totalSpent;
         const pnlPercent: number = (pnl / totalSpent) * 100;
+        const totalPnl: number = pnl + item.allTimePnl;
         const historicalData: HistoricalData = await this.getHistoricalData(
           item.asset,
           price,
@@ -94,6 +95,8 @@ export class PortfolioService {
           totalSpent,
           pnl,
           pnlPercent,
+          allTimePnl: item.allTimePnl,
+          totalPnl,
           historicalData,
         };
         //add to portfolio assets
@@ -107,16 +110,31 @@ export class PortfolioService {
     return portfolioData;
   }
 
-  async getAssetAmount(userId: string): Promise<PortfolioAssetAmount[]> {
+  async getAssetStaticData(userId: string): Promise<PortfolioAssetAmount[]> {
     let assetsAmount: PortfolioAssetAmount[] | null =
       await this.cacheManager.get(`portfolio:${userId}`);
     //no asset data stored in cache
     if (!assetsAmount) {
       //get amount from db
-      assetsAmount = await this.portfolioRepository.find({
-        where: { userId },
-        select: ['asset', 'amount', 'averageEntryPrice'],
-      });
+      assetsAmount = await this.portfolioRepository
+        .createQueryBuilder('portfolio')
+        .leftJoinAndSelect('portfolio.history', 'history')
+        .where('portfolio.userId = :userId', { userId })
+        .select([
+          'portfolio.asset',
+          'portfolio.amount',
+          'portfolio.averageEntryPrice',
+          'history.allTimePnl',
+        ])
+        .getMany()
+        .then((portfolios) =>
+          portfolios.map((portfolio) => ({
+            asset: portfolio.asset,
+            amount: portfolio.amount,
+            averageEntryPrice: portfolio.averageEntryPrice,
+            allTimePnl: portfolio.history ? portfolio.history.allTimePnl : 0,
+          })),
+        );
 
       //writing users portfolio data into cache with time-to-leave of 1h
       this.cacheManager.set(`portfolio:${userId}`, assetsAmount, 3600000);

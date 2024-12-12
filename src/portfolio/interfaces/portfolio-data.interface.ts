@@ -2,6 +2,7 @@ import { HistoricalData } from './historical-data.interface';
 
 export interface PortfolioData {
   userId: string;
+  currentPnl: number;
   assets?: PortfolioAsset[];
 }
 

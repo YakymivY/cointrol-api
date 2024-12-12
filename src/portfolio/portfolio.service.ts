@@ -63,6 +63,7 @@ export class PortfolioService {
     //initial value
     const portfolioData: PortfolioData = {
       userId,
+      currentPnl: 0,
       assets: [],
     };
 
@@ -86,6 +87,10 @@ export class PortfolioService {
           item.asset,
           price,
         );
+
+        //current pnl incrementation
+        portfolioData.currentPnl += pnl;
+
         const assetObj: PortfolioAsset = {
           asset: item.asset,
           amount: item.amount,

@@ -11,12 +11,18 @@ import { BalanceRepository } from './repositories/balance.repository';
 import { UsersRepository } from 'src/auth/users.repository';
 import { WebsocketService } from 'src/shared/websocket/websocket.service';
 import { HistoryRepository } from './repositories/history.repository';
+import { History } from './entities/history.entity';
+import { IsAssetValidConstraint } from 'src/shared/validators/is-asset-valid.validator';
+import { AssetsRepository } from 'src/shared/integrations/assets.repository';
+import { Asset } from 'src/shared/integrations/entities/asset.entity';
+import { SharedModule } from 'src/shared/shared.module';
 
 @Module({
   imports: [
     HttpModule,
     AuthModule,
-    TypeOrmModule.forFeature([Portfolio, Balance]),
+    SharedModule,
+    TypeOrmModule.forFeature([Portfolio, Balance, History, Asset]),
   ],
   controllers: [PortfolioController],
   providers: [
@@ -26,6 +32,8 @@ import { HistoryRepository } from './repositories/history.repository';
     UsersRepository,
     WebsocketService,
     HistoryRepository,
+    AssetsRepository,
+    IsAssetValidConstraint,
   ],
   exports: [HttpModule],
 })

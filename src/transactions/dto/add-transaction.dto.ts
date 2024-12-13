@@ -6,10 +6,12 @@ import {
   IsPositive,
   IsString,
 } from 'class-validator';
+import { isAssetValid } from 'src/shared/validators/is-asset-valid.validator';
 
 export class AddTransactionDto {
   @IsNotEmpty()
   @IsString()
+  @isAssetValid({ message: 'The specified asset is not valid.' })
   asset: string;
 
   @IsNotEmpty()

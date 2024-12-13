@@ -11,12 +11,17 @@ import { BalanceRepository } from 'src/portfolio/repositories/balance.repository
 import { StorageRepository } from './repositories/storage.repository';
 import { Storage } from './entities/storage.entity';
 import { HistoryRepository } from 'src/portfolio/repositories/history.repository';
+import { IsAssetValidConstraint } from 'src/shared/validators/is-asset-valid.validator';
+import { AssetsRepository } from 'src/shared/integrations/assets.repository';
+import { Asset } from 'src/shared/integrations/entities/asset.entity';
+import { SharedModule } from 'src/shared/shared.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Transaction, Storage]),
+    TypeOrmModule.forFeature([Transaction, Storage, Asset]),
     AuthModule,
     PortfolioModule,
+    SharedModule,
   ],
   controllers: [TransactionsController],
   providers: [
@@ -26,6 +31,8 @@ import { HistoryRepository } from 'src/portfolio/repositories/history.repository
     BalanceRepository,
     StorageRepository,
     HistoryRepository,
+    AssetsRepository,
+    IsAssetValidConstraint,
   ],
 })
 export class TransactionsModule {}

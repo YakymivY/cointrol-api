@@ -18,6 +18,11 @@ import { GatewayModule } from './shared/gateway/gateway.module';
 import { Storage } from './transactions/entities/storage.entity';
 import { Balance } from './portfolio/entities/balance.entity';
 import { History } from './portfolio/entities/history.entity';
+import { IntegrationsModule } from './shared/integrations/integrations.module';
+import { SharedModule } from './shared/shared.module';
+import { WatchlistModule } from './watchlist/watchlist.module';
+import { IsAssetValidConstraint } from './shared/validators/is-asset-valid.validator';
+import { AssetsRepository } from './shared/integrations/assets.repository';
 
 @Module({
   imports: [
@@ -51,9 +56,18 @@ import { History } from './portfolio/entities/history.entity';
     TransactionsModule,
     WebsocketModule,
     GatewayModule,
+    IntegrationsModule,
+    SharedModule,
+    WatchlistModule,
   ],
   controllers: [AppController],
-  providers: [AppService, JwtStrategy, UsersRepository],
+  providers: [
+    AppService,
+    JwtStrategy,
+    UsersRepository,
+    AssetsRepository,
+    IsAssetValidConstraint,
+  ],
   exports: [JwtStrategy],
 })
 export class AppModule {}

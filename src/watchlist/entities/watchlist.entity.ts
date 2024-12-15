@@ -1,3 +1,5 @@
+import { ThresholdDirection } from 'src/shared/enums/threshold-direction.enum';
+import { WatchlistStatus } from 'src/shared/enums/watchlist-status.enum';
 import {
   Column,
   CreateDateColumn,
@@ -27,7 +29,18 @@ export class Watchlist {
   })
   price_threshold: number;
 
-  @Column({ default: 'active' })
+  @Column({
+    type: 'enum',
+    enum: ThresholdDirection,
+    default: ThresholdDirection.ABOVE,
+  })
+  threshold_direction: string;
+
+  @Column({
+    type: 'enum',
+    enum: WatchlistStatus,
+    default: WatchlistStatus.ACTIVE,
+  })
   status: string;
 
   @Column()

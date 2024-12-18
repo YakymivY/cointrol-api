@@ -180,12 +180,12 @@ export class PortfolioService {
     const cacheKey: string = `historicalPrices:${asset}`;
 
     //check if the data is in cache
-    let historicalData = await this.cacheManager.get<{ [key: string]: number }>(
-      cacheKey,
-    );
-    const historicalDataChange: HistoricalData = {};
+    let historicalDataChange: HistoricalData =
+      await this.cacheManager.get<HistoricalData>(cacheKey);
+    //const historicalDataChange: HistoricalData = {};
 
-    if (!historicalData) {
+    if (!historicalDataChange) {
+      historicalDataChange = {};
       try {
         //fetch prices from external API
         const [price1h, price1d, price7d] = await Promise.all([
@@ -195,7 +195,7 @@ export class PortfolioService {
         ]);
 
         //create object and store in cache
-        historicalData = { '1h': price1h, '1d': price1d, '7d': price7d };
+        const historicalData = { '1h': price1h, '1d': price1d, '7d': price7d };
 
         //calculate percentage change
         for (const [key, historicalPrice] of Object.entries(historicalData)) {
@@ -215,7 +215,6 @@ export class PortfolioService {
         throw new Error('Historical data fetch failed');
       }
     }
-
     return historicalDataChange;
   }
 

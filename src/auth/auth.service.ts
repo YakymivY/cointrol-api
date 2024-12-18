@@ -1,4 +1,9 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AuthUserDto } from './dto/auth-user.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { UsersRepository } from './users.repository';
@@ -16,6 +21,11 @@ export class AuthService {
   ) {}
 
   async registerUser(registerUserDto: AuthUserDto): Promise<void> {
+    const { email } = registerUserDto;
+    const user = await this.usersRepository.findOne({ where: { email } });
+    if (user) {
+      throw new ConflictException('Email is already in use.');
+    }
     return this.usersRepository.createUser(registerUserDto);
   }
 
@@ -25,7 +35,7 @@ export class AuthService {
     const user = await this.usersRepository.findOne({ where: { email } });
     if (user && (await bcrypt.compare(password, user.password))) {
       //user exists and password is correct
-      const payload: JwtPayload = { email }; //create token payload
+      const payload: JwtPayload = { userId: user.id, email }; //create token payload
       const token: string = await this.jwtService.sign(payload);
       return { token };
     } else {

@@ -11,8 +11,10 @@ import { PortfolioService } from 'src/portfolio/portfolio.service';
 import { Cache } from '@nestjs/cache-manager';
 import { PortfolioAssetAmount } from 'src/portfolio/interfaces/portfolio-data.interface';
 import { WebsocketService } from '../websocket/websocket.service';
+import { ConfigService } from '@nestjs/config';
+import * as jwt from 'jsonwebtoken';
 
-@WebSocketGateway({ cors: true })
+@WebSocketGateway({ cors: { origin: '*' } })
 export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
   private logger = new Logger('Websocket gateway');
@@ -25,24 +27,43 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private portfolioService: PortfolioService,
     private wsService: WebsocketService,
+    private readonly env: ConfigService,
     @Inject('CACHE_MANAGER') private cacheManager: Cache,
   ) {}
 
   // when a client connects
   handleConnection(client: Socket): void {
-    const userId: string = client.handshake.query.userId as string;
-    //there is no userId provided
-    if (!userId) {
+    const JWT_SECRET: string = this.env.get<string>('JWT_SECRET');
+    const token: string = client.handshake.auth?.token as string;
+    //there is no token provided
+    if (!token) {
+      this.logger.error('Authentication token missing.');
       client.disconnect();
-      this.logger.warn('Client disconnected due to missing user id.');
+      return;
     }
 
-    //get existing socket ids or create new
-    const sockets = this.userConnections.get(userId) || new Set();
-    sockets.add(client.id);
-    this.userConnections.set(userId, sockets);
+    try {
+      //decode and verify token
+      const payload: any = jwt.verify(token, JWT_SECRET);
+      const userId: string = payload.userId;
 
-    this.logger.log(`Client connected: ${userId}. Socket: ${client.id}`);
+      if (!userId) {
+        throw new Error('Invalid token payload');
+      }
+
+      //store userId
+      client.data.userId = userId;
+
+      //get existing socket ids or create new
+      const sockets = this.userConnections.get(userId) || new Set();
+      sockets.add(client.id);
+      this.userConnections.set(userId, sockets);
+
+      this.logger.log(`Client connected: ${userId}. Socket: ${client.id}`);
+    } catch (error) {
+      this.logger.error('Authentication error:', error.message);
+      client.disconnect();
+    }
   }
 
   //when a clients disconnects
@@ -69,11 +90,8 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('subscribe-portfolio-data')
-  async handlePortfolioSubscription(
-    client: Socket,
-    payload: { userId: string },
-  ) {
-    const { userId } = payload;
+  async handlePortfolioSubscription(client: Socket) {
+    const userId: string = client.data.userId;
 
     //check unsubscribed users
     if (!this.userConnections.has(userId)) {

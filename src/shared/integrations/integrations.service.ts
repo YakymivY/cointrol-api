@@ -65,4 +65,13 @@ export class IntegrationsService {
     const assetsList: string[] = assets.map((item) => item.ticker);
     return assetsList;
   }
+
+  async isAsset(query: string): Promise<boolean> {
+    query = query.toUpperCase();
+    const asset: Asset = await this.assetsRepository.findOne({
+      where: { ticker: query },
+    });
+
+    return asset ? true : false;
+  }
 }

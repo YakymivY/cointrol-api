@@ -14,4 +14,9 @@ export class IntegrationsController {
   findAssets(@Query('ticker') query: string): Promise<string[]> {
     return this.integrationsService.findAsset(query);
   }
+
+  @Get('/validate-asset')
+  validateAsset(@Query('ticker') query: string): Promise<boolean> {
+    return this.integrationsService.isAsset(query);
+  }
 }

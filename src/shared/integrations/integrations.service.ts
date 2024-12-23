@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { firstValueFrom } from 'rxjs';
 import { AssetsRepository } from './assets.repository';
 import { Asset } from './entities/asset.entity';
+import { Like } from 'typeorm';
 
 @Injectable()
 export class IntegrationsService {
@@ -56,8 +57,11 @@ export class IntegrationsService {
     }
   }
 
-  async getAllAssets(): Promise<string[]> {
-    const assets: Asset[] = await this.assetsRepository.find();
+  async findAsset(query: string): Promise<string[]> {
+    query = query.toUpperCase();
+    const assets: Asset[] = await this.assetsRepository.find({
+      where: { ticker: Like(`%${query}%`) },
+    });
     const assetsList: string[] = assets.map((item) => item.ticker);
     return assetsList;
   }

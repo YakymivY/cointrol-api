@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, Query } from '@nestjs/common';
 import { IntegrationsService } from './integrations.service';
 
 @Controller('integrations')
@@ -11,7 +11,7 @@ export class IntegrationsController {
   }
 
   @Get('/assets-list')
-  getListOfAssets(): Promise<string[]> {
-    return this.integrationsService.getAllAssets();
+  findAssets(@Query('ticker') query: string): Promise<string[]> {
+    return this.integrationsService.findAsset(query);
   }
 }

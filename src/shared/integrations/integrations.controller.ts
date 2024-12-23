@@ -9,4 +9,9 @@ export class IntegrationsController {
   syncAssets() {
     this.integrationsService.syncAssets();
   }
+
+  @Get('/assets-list')
+  getListOfAssets(): Promise<string[]> {
+    return this.integrationsService.getAllAssets();
+  }
 }

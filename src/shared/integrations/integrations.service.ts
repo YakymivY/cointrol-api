@@ -55,4 +55,10 @@ export class IntegrationsService {
       throw error;
     }
   }
+
+  async getAllAssets(): Promise<string[]> {
+    const assets: Asset[] = await this.assetsRepository.find();
+    const assetsList: string[] = assets.map((item) => item.ticker);
+    return assetsList;
+  }
 }

@@ -23,6 +23,7 @@ import { ChangePeriod } from 'src/shared/enums/change-period.enum';
 import { lastValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
 import { HistoricalData } from './interfaces/historical-data.interface';
+import { OwnedAsset } from './interfaces/owned-assets.interface';
 
 @Injectable()
 export class PortfolioService {
@@ -333,6 +334,24 @@ export class PortfolioService {
     } catch (error) {
       this.logger.error(`Error fetching user's balance: ${error}`);
       throw new InternalServerErrorException('Failed to get users balance');
+    }
+  }
+
+  async getUserAssets(userId: string): Promise<OwnedAsset[]> {
+    try {
+      const userAssets = await this.portfolioRepository.find({
+        where: { userId },
+      });
+
+      return userAssets.map((item) => ({
+        asset: item.asset,
+        amount: item.amount,
+      }));
+    } catch (error) {
+      this.logger.error(
+        `Failed to get assets owned by the user ${userId}: ${error.message}`,
+      );
+      throw new InternalServerErrorException('Failed to get user assets');
     }
   }
 }

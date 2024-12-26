@@ -7,6 +7,7 @@ import { PortfolioData } from './interfaces/portfolio-data.interface';
 import { FundsOperationDto } from './dto/funds-operation.dto';
 import { BalanceResponse } from './interfaces/balance-response.interface';
 import { WebsocketService } from 'src/shared/websocket/websocket.service';
+import { OwnedAsset } from './interfaces/owned-assets.interface';
 
 @Controller('portfolio')
 @UseGuards(AuthGuard())
@@ -34,6 +35,11 @@ export class PortfolioController {
   getPortfolioData(@GetUser() user: User): Promise<PortfolioData> {
     this.logger.verbose(`Getting portfolio data for user ${user.id}.`);
     return this.portfolioService.getPortfolio(user.id);
+  }
+
+  @Get('/assets')
+  getUserAssets(@GetUser() user: User): Promise<OwnedAsset[]> {
+    return this.portfolioService.getUserAssets(user.id);
   }
 
   @Post('/deposit')

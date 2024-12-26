@@ -18,6 +18,7 @@ import { Balance } from 'src/portfolio/entities/balance.entity';
 import { StorageRepository } from './repositories/storage.repository';
 import { Storage } from './entities/storage.entity';
 import { History } from 'src/portfolio/entities/history.entity';
+import { ILike } from 'typeorm';
 
 @Injectable()
 export class TransactionsService {
@@ -52,7 +53,15 @@ export class TransactionsService {
         throw new BadRequestException(
           `Insufficient balance. You need ${total} but only have ${userBalance.balance}.`,
         );
+      } else if (
+        amount < 0 &&
+        !(await this.hasEnoughAsset(user.id, asset, Math.abs(amount)))
+      ) {
+        throw new NotFoundException(
+          'Insufficient asset amount for the operation',
+        );
       }
+
       //get storage entity from db
       let storageObject = null;
       if (storage) {
@@ -112,13 +121,6 @@ export class TransactionsService {
 
       //there is no asset in the database for the user
       if (!portfolioAsset) {
-        //no asset to sell
-        if (amount < 0) {
-          throw new NotFoundException(
-            'Cannot sell asset that does not exist in the portfolio.',
-          );
-        }
-
         //create new history record and a new asset record for the user
         await this.historyRepository.manager.transaction(
           async (transactionalEntityManager) => {
@@ -262,5 +264,43 @@ export class TransactionsService {
     }
 
     return transactionsResponse;
+  }
+
+  async getAllStorages(): Promise<string[]> {
+    try {
+      const result: Storage[] = await this.storageRepository.find();
+      return result.map((item) => item.name);
+    } catch (error) {
+      this.logger.error('Failed to get list of storages:', error);
+      throw new InternalServerErrorException('Failed to get list of storages');
+    }
+  }
+
+  async isStorage(name: string): Promise<boolean> {
+    name = name.toLowerCase();
+    const storage: Storage = await this.storageRepository.findOne({
+      where: { name: ILike(`${name}`) },
+    });
+
+    return storage ? true : false;
+  }
+
+  async hasEnoughAsset(
+    userId: string,
+    asset: string,
+    amount: number,
+  ): Promise<boolean> {
+    try {
+      //get the asset used in the transaction
+      const portfolioAsset = await this.portfolioRepository.findOne({
+        where: { userId, asset },
+      });
+
+      //check if asset exists and has sufficient amount
+      return !!portfolioAsset && portfolioAsset.amount >= amount;
+    } catch (error) {
+      this.logger.error('Error fetching portfolio asset:', error);
+      throw new Error('Could not verify asset avaliability.');
+    }
   }
 }

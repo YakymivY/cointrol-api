@@ -64,16 +64,25 @@ export class PortfolioService {
     //initial value
     const portfolioData: PortfolioData = {
       userId,
-      currentPnl: 0,
+      portfolioValue: 0,
+      currentPnl: { value: 0, change: 0 },
+      fixedPnl: 0,
+      totalPnl: 0,
+      invested: 0,
+      bestPerformer: null,
+      worstPerformer: null,
       assets: [],
     };
+
+    let bestPnl: number;
+    let worstPnl: number;
 
     //get asset amount either from db or from cache
     const assetsAmount: PortfolioAssetAmount[] =
       await this.getAssetStaticData(userId);
 
     //adding additional data for each asset
-    for (const item of assetsAmount) {
+    for (const [index, item] of assetsAmount.entries()) {
       try {
         //wait for price to be fetched
         const price: number = await this.fetchExrate(item);
@@ -89,8 +98,27 @@ export class PortfolioService {
           price,
         );
 
-        //current pnl incrementation
-        portfolioData.currentPnl += pnl;
+        //portfolio stats incrementation
+        portfolioData.portfolioValue += total;
+        portfolioData.currentPnl.value += pnl;
+        portfolioData.fixedPnl += item.allTimePnl;
+        portfolioData.totalPnl += totalPnl;
+        portfolioData.invested += totalSpent;
+
+        //update best & worst performers
+        if (!bestPnl || !worstPnl) {
+          bestPnl = pnl;
+          worstPnl = pnl;
+          portfolioData.bestPerformer = index;
+          portfolioData.worstPerformer = index;
+        }
+        if (pnl > bestPnl) {
+          bestPnl = pnl;
+          portfolioData.bestPerformer = index;
+        } else if (pnl < worstPnl) {
+          worstPnl = pnl;
+          portfolioData.worstPerformer = index;
+        }
 
         const assetObj: PortfolioAsset = {
           asset: item.asset,
@@ -112,6 +140,10 @@ export class PortfolioService {
         throw new Error('Failed to update portfolio data');
       }
     }
+
+    //calculate change
+    portfolioData.currentPnl.change =
+      (portfolioData.currentPnl.value / portfolioData.invested) * 100;
 
     return portfolioData;
   }
@@ -227,6 +259,7 @@ export class PortfolioService {
     now.setTime(now.getTime() - period);
     const fetchDate: string = now.toISOString();
 
+    //create url, params and headers
     const url: string = `${this.env.get<string>('COINAPI_URL')}/exchangerate/${asset}/USDT/history`;
     const headers = {
       'X-CoinAPI-Key': this.env.get<string>('COINAPI_KEY'),
@@ -237,9 +270,19 @@ export class PortfolioService {
       limit: 1,
     };
     try {
+      //fetch data from external source
       const response = await lastValueFrom(
         this.http.get(url, { headers, params }),
       );
+
+      //check if data exists and is not empty
+      if (!response || !response.data || response.data.length === 0) {
+        this.logger.warn(
+          `Historical data for ${asset} in period ${period} ommited`,
+        );
+        return null;
+      }
+
       //extract price from whole object
       const { rate_open } = response.data[0];
       return rate_open;

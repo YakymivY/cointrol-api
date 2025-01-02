@@ -19,6 +19,7 @@ import { StorageRepository } from './repositories/storage.repository';
 import { Storage } from './entities/storage.entity';
 import { History } from 'src/portfolio/entities/history.entity';
 import { ILike } from 'typeorm';
+import { TransactionOutput } from './interfaces/transaction-output.interface';
 
 @Injectable()
 export class TransactionsService {
@@ -233,15 +234,35 @@ export class TransactionsService {
     }
   }
 
-  async getAllTransactions(userId: string): Promise<TransactionInterface[]> {
+  async getAllTransactions(
+    userId: string,
+    page?: number,
+    limit?: number,
+  ): Promise<TransactionOutput> {
+    page = page || 1; //default to 1 if not passed
+    limit = limit || 10; //default to 10 if not passed
+
+    //validate page and limit
+    page = Math.max(page, 1);
+    limit = Math.max(limit, 1);
+
     //creating initial array of txs
     const transactionsResponse: TransactionInterface[] = [];
 
     try {
+      //calc offset
+      const offset: number = (page - 1) * limit;
+
       //fetch txs from database
-      const transactions = await this.transactionRepository.find({
-        where: { userId },
-      });
+      const [transactions, total] =
+        await this.transactionRepository.findAndCount({
+          where: { userId },
+          skip: offset,
+          take: limit,
+          order: {
+            timestamp: 'DESC',
+          },
+        });
 
       //modify and add some fields
       for (const tx of transactions) {
@@ -257,14 +278,15 @@ export class TransactionsService {
         };
         transactionsResponse.push(outputTx);
       }
+
+      const totalPages = Math.ceil(total / limit);
+      return { data: transactionsResponse, total, page, totalPages };
     } catch (error) {
       this.logger.error(
         `Error getting transactions for user ${userId}: ${error.message}`,
       );
       throw new InternalServerErrorException('Failed to get user transactions');
     }
-
-    return transactionsResponse;
   }
 
   async getAllStorages(): Promise<string[]> {

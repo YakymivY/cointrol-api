@@ -8,4 +8,5 @@ export interface TransactionInterface {
   price: number;
   amount: number;
   total: number;
+  storage?: string;
 }

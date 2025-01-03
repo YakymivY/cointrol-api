@@ -7,6 +7,7 @@ import { UsersRepository } from 'src/auth/users.repository';
 import { BalanceRepository } from 'src/portfolio/repositories/balance.repository';
 import { HttpModule } from '@nestjs/axios';
 import { PortfolioModule } from 'src/portfolio/portfolio.module';
+import { FixedPnlRepository } from 'src/portfolio/repositories/fixed-pnl.repository';
 
 @Module({
   imports: [HttpModule, PortfolioModule],
@@ -17,6 +18,7 @@ import { PortfolioModule } from 'src/portfolio/portfolio.module';
     PortfolioRepository,
     UsersRepository,
     BalanceRepository,
+    FixedPnlRepository,
   ],
 })
 export class GatewayModule {}

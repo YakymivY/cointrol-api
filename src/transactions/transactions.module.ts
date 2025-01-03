@@ -15,6 +15,7 @@ import { IsAssetValidConstraint } from 'src/shared/validators/is-asset-valid.val
 import { AssetsRepository } from 'src/shared/integrations/assets.repository';
 import { Asset } from 'src/shared/integrations/entities/asset.entity';
 import { SharedModule } from 'src/shared/shared.module';
+import { FixedPnlRepository } from 'src/portfolio/repositories/fixed-pnl.repository';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { SharedModule } from 'src/shared/shared.module';
     HistoryRepository,
     AssetsRepository,
     IsAssetValidConstraint,
+    FixedPnlRepository,
   ],
 })
 export class TransactionsModule {}

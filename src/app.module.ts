@@ -23,6 +23,8 @@ import { SharedModule } from './shared/shared.module';
 import { WatchlistModule } from './watchlist/watchlist.module';
 import { IsAssetValidConstraint } from './shared/validators/is-asset-valid.validator';
 import { AssetsRepository } from './shared/integrations/assets.repository';
+import { ScheduleModule } from '@nestjs/schedule';
+import { FixedPnl } from './portfolio/entities/fixed-pnl.entity';
 
 @Module({
   imports: [
@@ -40,7 +42,15 @@ import { AssetsRepository } from './shared/integrations/assets.repository';
           type: 'postgres',
           autoLoadEntities: true,
           synchronize: false,
-          entities: [User, Portfolio, Transaction, Balance, Storage, History],
+          entities: [
+            User,
+            Portfolio,
+            Transaction,
+            Balance,
+            Storage,
+            History,
+            FixedPnl,
+          ],
           host: configService.get<string>('DB_HOST'),
           port: configService.get<number>('DB_PORT'),
           username: configService.get<string>('DB_USERNAME'),
@@ -53,6 +63,7 @@ import { AssetsRepository } from './shared/integrations/assets.repository';
       isGlobal: true,
       store: redisStore,
     }),
+    ScheduleModule.forRoot(),
     TransactionsModule,
     WebsocketModule,
     GatewayModule,

@@ -16,13 +16,15 @@ import { IsAssetValidConstraint } from 'src/shared/validators/is-asset-valid.val
 import { AssetsRepository } from 'src/shared/integrations/assets.repository';
 import { Asset } from 'src/shared/integrations/entities/asset.entity';
 import { SharedModule } from 'src/shared/shared.module';
+import { FixedPnlRepository } from './repositories/fixed-pnl.repository';
+import { FixedPnl } from './entities/fixed-pnl.entity';
 
 @Module({
   imports: [
     HttpModule,
     AuthModule,
     SharedModule,
-    TypeOrmModule.forFeature([Portfolio, Balance, History, Asset]),
+    TypeOrmModule.forFeature([Portfolio, Balance, History, Asset, FixedPnl]),
   ],
   controllers: [PortfolioController],
   providers: [
@@ -34,6 +36,7 @@ import { SharedModule } from 'src/shared/shared.module';
     HistoryRepository,
     AssetsRepository,
     IsAssetValidConstraint,
+    FixedPnlRepository,
   ],
   exports: [HttpModule],
 })

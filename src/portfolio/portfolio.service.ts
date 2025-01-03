@@ -24,6 +24,8 @@ import { lastValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
 import { HistoricalData } from './interfaces/historical-data.interface';
 import { OwnedAsset } from './interfaces/owned-assets.interface';
+import { FixedPnlRepository } from './repositories/fixed-pnl.repository';
+import { FixedPnl } from './interfaces/fixed-pnl.interface';
 
 @Injectable()
 export class PortfolioService {
@@ -38,6 +40,8 @@ export class PortfolioService {
     private readonly balanceRepository: BalanceRepository,
     @InjectRepository(UsersRepository)
     private readonly usersRepository: UsersRepository,
+    @InjectRepository(FixedPnlRepository)
+    private readonly fixedPnlRepository: FixedPnlRepository,
     @Inject('CACHE_MANAGER') private cacheManager: Cache,
   ) {}
 
@@ -396,5 +400,12 @@ export class PortfolioService {
       );
       throw new InternalServerErrorException('Failed to get user assets');
     }
+  }
+
+  async getUserFixedPnlsHistory(userId: string): Promise<FixedPnl[]> {
+    const fixedPlnRecords: FixedPnl[] = await this.fixedPnlRepository.find({
+      where: { userId },
+    });
+    return fixedPlnRecords;
   }
 }

@@ -20,6 +20,8 @@ import { Storage } from './entities/storage.entity';
 import { History } from 'src/portfolio/entities/history.entity';
 import { ILike } from 'typeorm';
 import { TransactionOutput } from './interfaces/transaction-output.interface';
+import { FixedPnlRepository } from 'src/portfolio/repositories/fixed-pnl.repository';
+import { FixedPnl } from 'src/portfolio/interfaces/fixed-pnl.interface';
 
 @Injectable()
 export class TransactionsService {
@@ -35,6 +37,8 @@ export class TransactionsService {
     private storageRepository: StorageRepository,
     @InjectRepository(HistoryRepository)
     private historyRepository: HistoryRepository,
+    @InjectRepository(FixedPnlRepository)
+    private fixedPnlRepository: FixedPnlRepository,
   ) {}
 
   async addTransaction(
@@ -178,15 +182,14 @@ export class TransactionsService {
             }
           }
 
-          // update all-time pnl in history
-          const historyRecord = await this.historyRepository.findOne({
-            where: { userId, asset },
-          });
-          const realizedPnl: number =
-            Math.abs(amount) * (price - portfolioAsset.averageEntryPrice);
-          historyRecord.allTimePnl = historyRecord.allTimePnl + realizedPnl;
-          await this.historyRepository.save(historyRecord);
-          this.logger.log(`History pnl successfully updated by ${realizedPnl}`);
+          //update asset and overall fixed pnl
+          this.updateFixedPnl(
+            userId,
+            asset,
+            amount,
+            price,
+            portfolioAsset.averageEntryPrice,
+          );
         }
 
         //update amount
@@ -213,6 +216,76 @@ export class TransactionsService {
       );
       throw new InternalServerErrorException(
         'An error occurred while updating the portfolio.',
+      );
+    }
+  }
+
+  async updateFixedPnl(
+    userId: string,
+    asset: string,
+    amount: number,
+    price: number,
+    avgEntry: number,
+  ): Promise<void> {
+    // update asset's all-time pnl in history
+    try {
+      const historyRecord = await this.historyRepository.findOne({
+        where: { userId, asset },
+      });
+      const realizedPnl: number = Math.abs(amount) * (price - avgEntry);
+      historyRecord.allTimePnl = historyRecord.allTimePnl + realizedPnl;
+      await this.historyRepository.save(historyRecord);
+      this.logger.log(`History pnl successfully updated by ${realizedPnl}`);
+    } catch (error) {
+      this.logger.error(
+        `Error updating history record for ${asset} in user's ${userId} portfolio: ${error}`,
+      );
+      throw new InternalServerErrorException(
+        'Failed to update asset`s all-timep pnl',
+      );
+    }
+
+    //update overall user's fixed pnl
+    let overallPnl: number;
+    try {
+      //find the latest fixed pnl record
+      const latestRecord: FixedPnl | null =
+        await this.fixedPnlRepository.getLatestFixedPnlRecord(userId);
+
+      if (!latestRecord) {
+        //calculate overall fixedPnlValue
+        overallPnl =
+          await this.historyRepository.calculateOverallFixedPnl(userId);
+        this.logger.debug(`Calculated overall fixed PnL: ${overallPnl}`);
+      } else {
+        overallPnl = latestRecord.fixedPnl;
+      }
+
+      //create a new record of overall fixed pnl
+      const realizedPnl: number = Math.abs(amount) * (price - avgEntry);
+      overallPnl = overallPnl + realizedPnl;
+    } catch (error) {
+      this.logger.error('Error finding latest fixed pnl record:', error);
+      throw new InternalServerErrorException(
+        'Failed to get latest fixed pnl record',
+      );
+    }
+
+    //compose an object
+    const newRecord = this.fixedPnlRepository.create({
+      userId,
+      fixedPnl: overallPnl,
+    });
+    //save into db
+    try {
+      await this.fixedPnlRepository.save(newRecord);
+    } catch (error) {
+      this.logger.error(
+        'Error saving new overall fixed pnl value into database: ',
+        error,
+      );
+      throw new InternalServerErrorException(
+        'Failed to save overall fixed pnl record',
       );
     }
   }

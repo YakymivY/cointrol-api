@@ -8,6 +8,7 @@ import { FundsOperationDto } from './dto/funds-operation.dto';
 import { BalanceResponse } from './interfaces/balance-response.interface';
 import { WebsocketService } from 'src/shared/websocket/websocket.service';
 import { OwnedAsset } from './interfaces/owned-assets.interface';
+import { FixedPnl } from './interfaces/fixed-pnl.interface';
 
 @Controller('portfolio')
 @UseGuards(AuthGuard())
@@ -64,6 +65,12 @@ export class PortfolioController {
   //get balance of user
   getUserBalance(@GetUser() user: User): Promise<BalanceResponse | null> {
     return this.portfolioService.getUserBalance(user.id);
+  }
+
+  @Get('/fixed-pnl')
+  //get history of user's fixed pnls
+  getUserFixedPnls(@GetUser() user: User): Promise<FixedPnl[]> {
+    return this.portfolioService.getUserFixedPnlsHistory(user.id);
   }
 
   //optional

@@ -1,12 +1,4 @@
-import {
-  Column,
-  Entity,
-  JoinColumn,
-  OneToOne,
-  PrimaryColumn,
-  UpdateDateColumn,
-} from 'typeorm';
-import { Portfolio } from './portfolio.entity';
+import { Column, Entity, PrimaryColumn, UpdateDateColumn } from 'typeorm';
 
 @Entity()
 export class History {
@@ -32,11 +24,4 @@ export class History {
     default: () => 'CURRENT_TIMESTAMP',
   })
   updatedAt: Date;
-
-  @OneToOne(() => Portfolio, (portfolio) => portfolio.history, {
-    nullable: true,
-  })
-  @JoinColumn({ name: 'userId', referencedColumnName: 'userId' })
-  @JoinColumn({ name: 'asset', referencedColumnName: 'asset' })
-  portfolio?: Portfolio;
 }

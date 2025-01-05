@@ -18,10 +18,11 @@ import { Balance } from 'src/portfolio/entities/balance.entity';
 import { StorageRepository } from './repositories/storage.repository';
 import { Storage } from './entities/storage.entity';
 import { History } from 'src/portfolio/entities/history.entity';
-import { ILike } from 'typeorm';
+import { DataSource, ILike, QueryRunner } from 'typeorm';
 import { TransactionOutput } from './interfaces/transaction-output.interface';
 import { FixedPnlRepository } from 'src/portfolio/repositories/fixed-pnl.repository';
-import { FixedPnl } from 'src/portfolio/interfaces/fixed-pnl.interface';
+import { Portfolio } from 'src/portfolio/entities/portfolio.entity';
+import { FixedPnl } from 'src/portfolio/entities/fixed-pnl.entity';
 
 @Injectable()
 export class TransactionsService {
@@ -39,6 +40,7 @@ export class TransactionsService {
     private historyRepository: HistoryRepository,
     @InjectRepository(FixedPnlRepository)
     private fixedPnlRepository: FixedPnlRepository,
+    private readonly dataSource: DataSource,
   ) {}
 
   async addTransaction(
@@ -47,6 +49,11 @@ export class TransactionsService {
   ): Promise<void> {
     const { asset, amount, price, storage } = addTransactionDto;
     const total: number = amount * price;
+
+    //start a database transaction
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
     try {
       const userBalance: Balance =
         await this.balanceRepository.findBalanceOfUser(user.id);
@@ -77,40 +84,61 @@ export class TransactionsService {
           this.logger.warn('Failed to find the storage in database');
         }
       }
+
       //save tx in database
-      await this.transactionRepository.createTransaction(
-        asset,
-        amount,
-        price,
-        user,
-        storageObject,
-      );
-      this.logger.log(
-        `Transaction created successfully for user ${user.id} - Asset: ${asset}, Amount: ${amount}, Price: ${price}.`,
+      await queryRunner.manager.save(
+        this.transactionRepository.createTransactionEntity(
+          asset,
+          amount,
+          price,
+          user,
+          storageObject,
+        ),
       );
 
       //update user portfolio data after transaction
-      await this.updatePortfolio(user.id, asset, amount, price, storageObject);
+      await this.updatePortfolio(
+        queryRunner,
+        user.id,
+        asset,
+        amount,
+        price,
+        storageObject,
+      );
       this.logger.log(`Portfolio updated successfully for user ${user.id}.`);
 
       //update balance of user
-      await this.updateBalance(user.id, amount * price);
+      await this.updateBalance(queryRunner, user.id, total);
       this.logger.log(`Balance updated successfully for user ${user.id}`);
+
+      //commit the transaction
+      await queryRunner.commitTransaction();
+      this.logger.log(`Transaction completed successfully for user ${user.id}`);
     } catch (error) {
+      //rollback the transaction in case of failure
+      await queryRunner.rollbackTransaction();
+
       this.logger.error(
         `Failed to add transaction for user ${user.id}. Error: ${error.message}`,
       );
       //rethrow error if it's already a recognized exception
-      if (error instanceof BadRequestException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
         throw error;
       }
       throw new InternalServerErrorException(
         'An error occured while processing the transaction.',
       );
+    } finally {
+      //release the query runner
+      await queryRunner.release();
     }
   }
 
   async updatePortfolio(
+    queryRunner: QueryRunner,
     userId: string,
     asset: string,
     amount: number,
@@ -119,7 +147,7 @@ export class TransactionsService {
   ): Promise<void> {
     try {
       //get the asset used in the transaction
-      const portfolioAsset = await this.portfolioRepository.findOne({
+      const portfolioAsset = await queryRunner.manager.findOne(Portfolio, {
         where: { userId, asset },
         relations: ['storages'],
       });
@@ -127,21 +155,16 @@ export class TransactionsService {
       //there is no asset in the database for the user
       if (!portfolioAsset) {
         //create new history record and a new asset record for the user
-        await this.historyRepository.manager.transaction(
-          async (transactionalEntityManager) => {
-            await transactionalEntityManager.save(History, {
-              userId,
-              asset,
-            });
-            await this.portfolioRepository.save({
-              userId,
-              asset,
-              amount,
-              averageEntryPrice: price,
-              storages: [storage],
-            });
-          },
-        );
+        const history = queryRunner.manager.create(History, { userId, asset });
+        const portfolio = queryRunner.manager.create(Portfolio, {
+          userId,
+          asset,
+          amount,
+          averageEntryPrice: price,
+          storages: storage ? [storage] : [],
+        });
+        await queryRunner.manager.save(history);
+        await queryRunner.manager.save(portfolio);
       } else {
         if (amount > 0) {
           //user is buying
@@ -183,7 +206,8 @@ export class TransactionsService {
           }
 
           //update asset and overall fixed pnl
-          this.updateFixedPnl(
+          await this.updateFixedPnl(
+            queryRunner,
             userId,
             asset,
             amount,
@@ -201,13 +225,13 @@ export class TransactionsService {
         } else if (portfolioAsset.amount == 0) {
           //user sold all tokens
           //remove record from portfolio
-          await this.portfolioRepository.remove(portfolioAsset);
+          await queryRunner.manager.remove(Portfolio, portfolioAsset);
           this.logger.log(`Asset was successfully deleted from portfolio`);
           return;
         }
 
         //save updated asset info
-        await this.portfolioRepository.save(portfolioAsset);
+        await queryRunner.manager.save(Portfolio, portfolioAsset);
       }
     } catch (error) {
       this.logger.error(
@@ -221,6 +245,7 @@ export class TransactionsService {
   }
 
   async updateFixedPnl(
+    queryRunner: QueryRunner,
     userId: string,
     asset: string,
     amount: number,
@@ -229,74 +254,89 @@ export class TransactionsService {
   ): Promise<void> {
     // update asset's all-time pnl in history
     try {
-      const historyRecord = await this.historyRepository.findOne({
+      const historyRecord = await queryRunner.manager.findOne(History, {
         where: { userId, asset },
       });
-      const realizedPnl: number = Math.abs(amount) * (price - avgEntry);
-      historyRecord.allTimePnl = historyRecord.allTimePnl + realizedPnl;
-      await this.historyRepository.save(historyRecord);
-      this.logger.log(`History pnl successfully updated by ${realizedPnl}`);
-    } catch (error) {
-      this.logger.error(
-        `Error updating history record for ${asset} in user's ${userId} portfolio: ${error}`,
-      );
-      throw new InternalServerErrorException(
-        'Failed to update asset`s all-timep pnl',
-      );
-    }
 
-    //update overall user's fixed pnl
-    let overallPnl: number;
-    try {
+      if (!historyRecord) {
+        throw Error(
+          `History record not found for user ${userId} and asset ${asset}`,
+        );
+      }
+
+      const realizedPnl: number = Math.abs(amount) * (price - avgEntry);
+      historyRecord.allTimePnl = (historyRecord.allTimePnl || 0) + realizedPnl;
+
+      await queryRunner.manager.save(History, historyRecord);
+      this.logger.log(`History pnl successfully updated by ${realizedPnl}`);
+
+      //update overall user's fixed pnl
+      let overallPnl: number;
+
       //find the latest fixed pnl record
-      const latestRecord: FixedPnl | null =
-        await this.fixedPnlRepository.getLatestFixedPnlRecord(userId);
+      const latestRecord = await queryRunner.manager.findOne(FixedPnl, {
+        where: { userId },
+        order: { timestamp: 'DESC' },
+        cache: true,
+      });
 
       if (!latestRecord) {
-        //calculate overall fixedPnlValue
-        overallPnl =
-          await this.historyRepository.calculateOverallFixedPnl(userId);
+        //calculate overall fixedPnlValue if no latest record exists
+        const userPnls: History[] = await queryRunner.manager.find(History, {
+          where: { userId },
+        });
+
+        overallPnl = userPnls.reduce(
+          (total, item) => total + (item.allTimePnl || 0),
+          0,
+        );
+
         this.logger.debug(`Calculated overall fixed PnL: ${overallPnl}`);
       } else {
         overallPnl = latestRecord.fixedPnl;
       }
 
-      //create a new record of overall fixed pnl
-      const realizedPnl: number = Math.abs(amount) * (price - avgEntry);
-      overallPnl = overallPnl + realizedPnl;
-    } catch (error) {
-      this.logger.error('Error finding latest fixed pnl record:', error);
-      throw new InternalServerErrorException(
-        'Failed to get latest fixed pnl record',
-      );
-    }
+      //update overall pnl with current tx realised pnl
+      overallPnl += realizedPnl;
 
-    //compose an object
-    const newRecord = this.fixedPnlRepository.create({
-      userId,
-      fixedPnl: overallPnl,
-    });
-    //save into db
-    try {
-      await this.fixedPnlRepository.save(newRecord);
+      //compose an object
+      const newRecord = queryRunner.manager.create(FixedPnl, {
+        userId,
+        fixedPnl: overallPnl,
+      });
+
+      //save the new record into database
+      await queryRunner.manager.save(FixedPnl, newRecord);
+      this.logger.log(`Overall fixed PnL record updated successfully.`);
     } catch (error) {
       this.logger.error(
-        'Error saving new overall fixed pnl value into database: ',
-        error,
+        `Error updating fixed PnL for ${asset} in user's ${userId} portfolio: ${error}`,
       );
       throw new InternalServerErrorException(
-        'Failed to save overall fixed pnl record',
+        'An error occured while updating fixed PnL.',
       );
     }
   }
 
-  async updateBalance(userId: string, balanceChange: number): Promise<void> {
+  async updateBalance(
+    queryRunner: QueryRunner,
+    userId: string,
+    balanceChange: number,
+  ): Promise<void> {
     try {
-      const userBalance =
-        await this.balanceRepository.findBalanceOfUser(userId);
+      const userBalance = await queryRunner.manager.findOne(Balance, {
+        where: { user: { id: userId } },
+      });
+
+      if (!userBalance) {
+        this.logger.error(`Balance record not found for user ${userId}`);
+        throw new Error('Balance record not found.');
+      }
+
+      //update the balance
       userBalance.balance = userBalance.balance - balanceChange;
 
-      await this.balanceRepository.saveBalance(userBalance);
+      await queryRunner.manager.save(Balance, userBalance);
     } catch (error) {
       this.logger.error(
         `Failed to update balance for user ${userId}. Error: ${error.message}`,

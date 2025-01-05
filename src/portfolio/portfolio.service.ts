@@ -224,6 +224,7 @@ export class PortfolioService {
     if (!historicalDataChange) {
       historicalDataChange = {};
       try {
+        this.logger.debug(`Get hist data for ${asset}`);
         //fetch prices from external API
         const [price1h, price1d, price7d] = await Promise.all([
           this.fetchHistoricalPrice(asset, ChangePeriod.ONE_HOUR),
@@ -262,6 +263,10 @@ export class PortfolioService {
     const now = new Date();
     now.setTime(now.getTime() - period);
     const fetchDate: string = now.toISOString();
+
+    this.logger.debug(
+      `Fetching historical data for ${asset} in period ${period}`,
+    );
 
     //create url, params and headers
     const url: string = `${this.env.get<string>('COINAPI_URL')}/exchangerate/${asset}/USDT/history`;

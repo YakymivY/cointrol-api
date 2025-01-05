@@ -2,6 +2,7 @@ import { Storage } from 'src/transactions/entities/storage.entity';
 import {
   Column,
   Entity,
+  JoinColumn,
   JoinTable,
   ManyToMany,
   OneToOne,
@@ -48,6 +49,10 @@ export class Portfolio {
   })
   storages: Storage[];
 
-  @OneToOne(() => History, (history) => history.portfolio)
+  @OneToOne(() => History)
+  @JoinColumn([
+    { name: 'userId', referencedColumnName: 'userId' },
+    { name: 'asset', referencedColumnName: 'asset' },
+  ])
   history: History;
 }

@@ -69,7 +69,7 @@ export class TransactionsService {
         amount < 0 &&
         !(await this.hasEnoughAsset(user.id, asset, Math.abs(amount)))
       ) {
-        throw new NotFoundException(
+        throw new BadRequestException(
           'Insufficient asset amount for the operation',
         );
       }
@@ -199,7 +199,7 @@ export class TransactionsService {
               this.logger.error(
                 `Failed to remove storage of tokens. There is no such value: ${storage.name}`,
               );
-              throw new Error(
+              throw new BadRequestException(
                 'Provided storage was not found and could not be removed',
               );
             }

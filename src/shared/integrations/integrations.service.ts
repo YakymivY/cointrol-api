@@ -2,10 +2,14 @@ import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { firstValueFrom } from 'rxjs';
-import { AssetsRepository } from './assets.repository';
+import { firstValueFrom, lastValueFrom } from 'rxjs';
 import { Asset } from './entities/asset.entity';
 import { Like } from 'typeorm';
+import { AssetsRepository } from './repositories/assets.repository';
+import { CoinlistItem } from './interfaces/coinlist-item.interface';
+import { CoinsRepository } from './repositories/coins.repository';
+import { Coin } from './entities/coin.entity';
+import { CoinMetrics } from './interfaces/coin-metrics.interface';
 
 @Injectable()
 export class IntegrationsService {
@@ -17,6 +21,8 @@ export class IntegrationsService {
     private readonly http: HttpService,
     @InjectRepository(AssetsRepository)
     private assetsRepository: AssetsRepository,
+    @InjectRepository(CoinsRepository)
+    private coinsRepository: CoinsRepository,
   ) {}
 
   async syncAssets(): Promise<void> {
@@ -73,5 +79,76 @@ export class IntegrationsService {
     });
 
     return asset ? true : false;
+  }
+
+  //CoinGecko data
+
+  async fetchCoinList(): Promise<CoinlistItem[]> {
+    const url: string = this.env.get<string>('COINGECKO_BASE_URL');
+    const key: string = this.env.get<string>('COINGECKO_API_KEY');
+
+    const headers = {
+      'x-cg-demo-api-key': key,
+    };
+    const response = await lastValueFrom(
+      this.http.get<CoinlistItem[]>(`${url}/coins/list`, { headers }),
+    );
+    return response.data;
+  }
+
+  async updateCoinList(): Promise<void> {
+    const coinList: CoinlistItem[] = await this.fetchCoinList();
+
+    const coinsToSave = coinList.map((coin) => ({
+      coingeckoId: coin.id,
+      symbol: coin.symbol,
+      name: coin.name,
+    }));
+
+    await this.coinsRepository.saveCoins(coinsToSave);
+  }
+
+  async getCoinIdsByTicker(ticker: string): Promise<string[]> {
+    //get all coins with appropriate ticker
+    const coins: Coin[] = await this.coinsRepository.find({
+      where: { symbol: ticker },
+    });
+    //extract ids
+    const ids: string[] = coins.map((coin) => coin.coingeckoId);
+    return ids;
+  }
+
+  async getMetadataForCoins(ticker: string): Promise<CoinMetrics> {
+    const ids: string[] = await this.getCoinIdsByTicker(ticker.toLowerCase());
+
+    const url: string = this.env.get<string>('COINGECKO_BASE_URL');
+    const key: string = this.env.get<string>('COINGECKO_API_KEY');
+
+    //add authentication header
+    const headers = {
+      'x-cg-demo-api-key': key,
+    };
+    //compose params
+    const params = {
+      vs_currency: 'usd',
+      order: 'market_cap_desc',
+      ids: ids.join(','),
+    };
+    try {
+      //fetch from api
+      const response = await lastValueFrom(
+        this.http.get<CoinMetrics[]>(`${url}/coins/markets`, {
+          headers,
+          params,
+        }),
+      );
+      return response.data[0];
+    } catch (error) {
+      this.logger.error(
+        'Error fetching data from coingecko metadata api:',
+        error.message,
+      );
+      throw error;
+    }
   }
 }

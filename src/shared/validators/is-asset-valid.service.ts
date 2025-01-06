@@ -4,7 +4,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { AssetsRepository } from '../integrations/assets.repository';
+import { AssetsRepository } from '../integrations/repositories/assets.repository';
 
 @Injectable()
 export class IsAssetValidService {

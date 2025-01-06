@@ -22,9 +22,10 @@ import { IntegrationsModule } from './shared/integrations/integrations.module';
 import { SharedModule } from './shared/shared.module';
 import { WatchlistModule } from './watchlist/watchlist.module';
 import { IsAssetValidConstraint } from './shared/validators/is-asset-valid.validator';
-import { AssetsRepository } from './shared/integrations/assets.repository';
 import { ScheduleModule } from '@nestjs/schedule';
 import { FixedPnl } from './portfolio/entities/fixed-pnl.entity';
+import { AssetsRepository } from './shared/integrations/repositories/assets.repository';
+import { Coin } from './shared/integrations/entities/coin.entity';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { FixedPnl } from './portfolio/entities/fixed-pnl.entity';
             Storage,
             History,
             FixedPnl,
+            Coin,
           ],
           host: configService.get<string>('DB_HOST'),
           port: configService.get<number>('DB_PORT'),

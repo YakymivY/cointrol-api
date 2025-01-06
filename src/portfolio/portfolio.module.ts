@@ -13,11 +13,11 @@ import { WebsocketService } from 'src/shared/websocket/websocket.service';
 import { HistoryRepository } from './repositories/history.repository';
 import { History } from './entities/history.entity';
 import { IsAssetValidConstraint } from 'src/shared/validators/is-asset-valid.validator';
-import { AssetsRepository } from 'src/shared/integrations/assets.repository';
 import { Asset } from 'src/shared/integrations/entities/asset.entity';
 import { SharedModule } from 'src/shared/shared.module';
 import { FixedPnlRepository } from './repositories/fixed-pnl.repository';
 import { FixedPnl } from './entities/fixed-pnl.entity';
+import { AssetsRepository } from 'src/shared/integrations/repositories/assets.repository';
 
 @Module({
   imports: [

@@ -12,10 +12,10 @@ import { StorageRepository } from './repositories/storage.repository';
 import { Storage } from './entities/storage.entity';
 import { HistoryRepository } from 'src/portfolio/repositories/history.repository';
 import { IsAssetValidConstraint } from 'src/shared/validators/is-asset-valid.validator';
-import { AssetsRepository } from 'src/shared/integrations/assets.repository';
 import { Asset } from 'src/shared/integrations/entities/asset.entity';
 import { SharedModule } from 'src/shared/shared.module';
 import { FixedPnlRepository } from 'src/portfolio/repositories/fixed-pnl.repository';
+import { AssetsRepository } from 'src/shared/integrations/repositories/assets.repository';
 
 @Module({
   imports: [

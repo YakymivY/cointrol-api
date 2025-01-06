@@ -2,13 +2,15 @@ import { Module } from '@nestjs/common';
 import { IntegrationsService } from './integrations.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Asset } from './entities/asset.entity';
-import { AssetsRepository } from './assets.repository';
 import { IntegrationsController } from './integrations.controller';
 import { HttpModule } from '@nestjs/axios';
+import { AssetsRepository } from './repositories/assets.repository';
+import { Coin } from './entities/coin.entity';
+import { CoinsRepository } from './repositories/coins.repository';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Asset]), HttpModule],
-  providers: [IntegrationsService, AssetsRepository],
+  imports: [TypeOrmModule.forFeature([Asset, Coin]), HttpModule],
+  providers: [IntegrationsService, AssetsRepository, CoinsRepository],
   controllers: [IntegrationsController],
   exports: [AssetsRepository],
 })

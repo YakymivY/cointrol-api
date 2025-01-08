@@ -1,10 +1,4 @@
-import {
-  BadRequestException,
-  Controller,
-  Get,
-  Post,
-  Query,
-} from '@nestjs/common';
+import { Controller, Get, Post, Query } from '@nestjs/common';
 import { IntegrationsService } from './integrations.service';
 import { CoinlistItem } from './interfaces/coinlist-item.interface';
 import { CoinMetrics } from './interfaces/coin-metrics.interface';
@@ -52,13 +46,21 @@ export class IntegrationsController {
   @Get('tokenlist-item-data')
   async getTokenlistItemData(
     @Query('tickers') tickers: string,
+    @Query('page') page: number,
+    @Query('limit') limit: number,
   ): Promise<CoinComplex[]> {
+    let tickerArray: string[];
     if (!tickers) {
-      throw new BadRequestException('Tickers query parameter is required');
+      tickerArray = await this.integrationsService.getTopMarketCap();
+    } else {
+      //split tickers string into an array
+      tickerArray = tickers.split(',').map((ticker) => ticker.trim());
     }
-    //split tickers string into an array
-    const tickerArray = tickers.split(',').map((ticker) => ticker.trim());
 
-    return this.integrationsService.getDataForTokenList(tickerArray);
+    return this.integrationsService.getDataForTokenList(
+      tickerArray,
+      page,
+      limit,
+    );
   }
 }

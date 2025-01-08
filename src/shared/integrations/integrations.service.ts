@@ -210,14 +210,32 @@ export class IntegrationsService {
     return tokenData;
   }
 
-  async getDataForTokenList(tickers: string[]): Promise<CoinComplex[]> {
+  async getDataForTokenList(
+    tickers: string[],
+    page?: number,
+    limit?: number,
+  ): Promise<CoinComplex[]> {
+    page = page || 1;
+    limit = limit || 10;
+
+    //validate page and limit
+    page = Math.max(page, 1);
+    limit = Math.max(limit, 1);
+
     if (!tickers || tickers.length === 0) {
       throw new Error('No tickers provided');
     }
 
+    //calculate the starting and ending indices
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+
+    //slice the tickers array
+    const tickersForPage = tickers.slice(startIndex, endIndex);
+
     try {
       const results = await Promise.all(
-        tickers.map(async (ticker) => {
+        tickersForPage.map(async (ticker) => {
           try {
             return await this.getDataForTokenListItem(ticker);
           } catch (error) {
@@ -232,6 +250,44 @@ export class IntegrationsService {
     } catch (error) {
       console.error('Failed to fetch data for token list', error);
       throw new Error('Unable to retrieve data for the provided token list');
+    }
+  }
+
+  async getTopMarketCap(): Promise<string[]> {
+    const url: string = this.env.get<string>('COINGECKO_BASE_URL');
+    const key: string = this.env.get<string>('COINGECKO_API_KEY');
+
+    //add authentication header
+    const headers = {
+      'x-cg-demo-api-key': key,
+    };
+    //add parameters
+    const params = {
+      vs_currency: 'usd',
+      order: 'market_cap_desc',
+      per_page: 100,
+      page: 1,
+      sparkline: false,
+    };
+
+    try {
+      //fetch whole data
+      const response = await lastValueFrom(
+        this.http.get<any>(`${url}/coins/markets`, {
+          headers,
+          params,
+        }),
+      );
+
+      //extract symbols only
+      const tickers = response.data.map((coin) => coin.symbol);
+      return tickers;
+    } catch (error) {
+      this.logger.error(
+        'Error fetching top mc coins from coinmarketcap api:',
+        error.message,
+      );
+      throw error;
     }
   }
 }

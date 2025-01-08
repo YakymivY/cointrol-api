@@ -12,6 +12,7 @@ import { Coin } from './entities/coin.entity';
 import { CoinMetrics } from './interfaces/coin-metrics.interface';
 import { CoinPrice } from './interfaces/coin-price.interface';
 import { CoinComplex } from './interfaces/coin-complex.interface';
+import { CoinComplexOutput } from './interfaces/coin-complex-output.interface';
 
 @Injectable()
 export class IntegrationsService {
@@ -214,7 +215,7 @@ export class IntegrationsService {
     tickers: string[],
     page?: number,
     limit?: number,
-  ): Promise<CoinComplex[]> {
+  ): Promise<CoinComplexOutput> {
     page = page || 1;
     limit = limit || 10;
 
@@ -224,6 +225,15 @@ export class IntegrationsService {
 
     if (!tickers || tickers.length === 0) {
       throw new Error('No tickers provided');
+    }
+
+    //calculate total items and total pages
+    const total = tickers.length;
+    const totalPages = Math.ceil(total / limit);
+
+    //ensure page does not exceed totalPages
+    if (page > totalPages) {
+      return { data: [], total, page, totalPages };
     }
 
     //calculate the starting and ending indices
@@ -245,8 +255,15 @@ export class IntegrationsService {
         }),
       );
 
+      const filteredResults = results.filter((result) => result !== null);
+
       //Filter out any failed results (null values)
-      return results.filter((result) => result !== null);
+      return {
+        data: filteredResults,
+        total,
+        page,
+        totalPages,
+      };
     } catch (error) {
       console.error('Failed to fetch data for token list', error);
       throw new Error('Unable to retrieve data for the provided token list');

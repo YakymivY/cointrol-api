@@ -2,7 +2,7 @@ import { Controller, Get, Post, Query } from '@nestjs/common';
 import { IntegrationsService } from './integrations.service';
 import { CoinlistItem } from './interfaces/coinlist-item.interface';
 import { CoinMetrics } from './interfaces/coin-metrics.interface';
-import { CoinComplex } from './interfaces/coin-complex.interface';
+import { CoinComplexOutput } from './interfaces/coin-complex-output.interface';
 
 @Controller('integrations')
 export class IntegrationsController {
@@ -48,7 +48,7 @@ export class IntegrationsController {
     @Query('tickers') tickers: string,
     @Query('page') page: number,
     @Query('limit') limit: number,
-  ): Promise<CoinComplex[]> {
+  ): Promise<CoinComplexOutput> {
     let tickerArray: string[];
     if (!tickers) {
       tickerArray = await this.integrationsService.getTopMarketCap();

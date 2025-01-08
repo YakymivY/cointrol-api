@@ -10,6 +10,8 @@ import { CoinlistItem } from './interfaces/coinlist-item.interface';
 import { CoinsRepository } from './repositories/coins.repository';
 import { Coin } from './entities/coin.entity';
 import { CoinMetrics } from './interfaces/coin-metrics.interface';
+import { CoinPrice } from './interfaces/coin-price.interface';
+import { CoinComplex } from './interfaces/coin-complex.interface';
 
 @Injectable()
 export class IntegrationsService {
@@ -118,9 +120,7 @@ export class IntegrationsService {
     return ids;
   }
 
-  async getMetadataForCoins(ticker: string): Promise<CoinMetrics> {
-    const ids: string[] = await this.getCoinIdsByTicker(ticker.toLowerCase());
-
+  async getMetadataForCoins(ids: string[]): Promise<CoinMetrics> {
     const url: string = this.env.get<string>('COINGECKO_BASE_URL');
     const key: string = this.env.get<string>('COINGECKO_API_KEY');
 
@@ -149,6 +149,89 @@ export class IntegrationsService {
         error.message,
       );
       throw error;
+    }
+  }
+
+  async getPriceDataForCoin(id: string): Promise<CoinPrice> {
+    const url: string = this.env.get<string>('COINGECKO_BASE_URL');
+    const key: string = this.env.get<string>('COINGECKO_API_KEY');
+
+    //add authentication header
+    const headers = {
+      'x-cg-demo-api-key': key,
+    };
+    //add parameters
+    const params = {
+      ids: id,
+      vs_currencies: 'usd',
+      include_market_cap: false,
+      include_24hr_vol: true,
+      include_24hr_change: true,
+    };
+    try {
+      const response = await lastValueFrom(
+        this.http.get<CoinPrice>(`${url}/simple/price`, { headers, params }),
+      );
+      return response.data[id];
+    } catch (error) {
+      this.logger.error(
+        'Error fetching data from coingecko simple price api:',
+        error.message,
+      );
+      throw error;
+    }
+  }
+
+  async getDataForTokenListItem(ticker: string): Promise<CoinComplex> {
+    //get ids of coins with the same ticker
+    const ids: string[] = await this.getCoinIdsByTicker(ticker.toLowerCase());
+
+    //fetch metadata and coin price
+    const marketData: CoinMetrics = await this.getMetadataForCoins(ids);
+    const coinPriceData: CoinPrice = await this.getPriceDataForCoin(
+      marketData.id,
+    );
+
+    const tokenData: CoinComplex = {
+      id: marketData.id,
+      symbol: marketData.symbol,
+      name: marketData.name,
+      icon: marketData.image,
+      price: coinPriceData.usd,
+      market_cap: marketData.market_cap,
+      market_cap_rank: marketData.market_cap_rank,
+      usd_24h_change: coinPriceData.usd_24h_change,
+      usd_24h_vol: coinPriceData.usd_24h_vol,
+      ath: marketData.ath,
+      high_24h: marketData.high_24h,
+      low_24h: marketData.low_24h,
+    };
+
+    return tokenData;
+  }
+
+  async getDataForTokenList(tickers: string[]): Promise<CoinComplex[]> {
+    if (!tickers || tickers.length === 0) {
+      throw new Error('No tickers provided');
+    }
+
+    try {
+      const results = await Promise.all(
+        tickers.map(async (ticker) => {
+          try {
+            return await this.getDataForTokenListItem(ticker);
+          } catch (error) {
+            console.error(`Failed to fetch data for ${ticker}`, error);
+            return null;
+          }
+        }),
+      );
+
+      //Filter out any failed results (null values)
+      return results.filter((result) => result !== null);
+    } catch (error) {
+      console.error('Failed to fetch data for token list', error);
+      throw new Error('Unable to retrieve data for the provided token list');
     }
   }
 }

@@ -1,7 +1,14 @@
-import { Controller, Get, Post, Query } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { IntegrationsService } from './integrations.service';
 import { CoinlistItem } from './interfaces/coinlist-item.interface';
 import { CoinMetrics } from './interfaces/coin-metrics.interface';
+import { CoinComplex } from './interfaces/coin-complex.interface';
 
 @Controller('integrations')
 export class IntegrationsController {
@@ -36,6 +43,22 @@ export class IntegrationsController {
   @Get('coin-metrics')
   async getCoinMetrics(@Query('ticker') ticker: string): Promise<CoinMetrics> {
     //return first element because it has the greates market cap
-    return await this.integrationsService.getMetadataForCoins(ticker);
+    const ids: string[] = await this.integrationsService.getCoinIdsByTicker(
+      ticker.toLowerCase(),
+    );
+    return await this.integrationsService.getMetadataForCoins(ids);
+  }
+
+  @Get('tokenlist-item-data')
+  async getTokenlistItemData(
+    @Query('tickers') tickers: string,
+  ): Promise<CoinComplex[]> {
+    if (!tickers) {
+      throw new BadRequestException('Tickers query parameter is required');
+    }
+    //split tickers string into an array
+    const tickerArray = tickers.split(',').map((ticker) => ticker.trim());
+
+    return this.integrationsService.getDataForTokenList(tickerArray);
   }
 }

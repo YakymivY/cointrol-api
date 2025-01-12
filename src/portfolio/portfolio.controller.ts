@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Logger, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Logger,
+  Param,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { PortfolioService } from './portfolio.service';
 import { GetUser } from 'src/auth/decorators/get-user.decorator';
 import { User } from 'src/auth/entities/user.entity';
@@ -19,17 +27,11 @@ export class PortfolioController {
     private websocketService: WebsocketService,
   ) {}
 
-  // @Get('/exchange-rate/:asset')
-  // //fetch exchange rates from external API
-  // async getExchangeRate(
-  //   @Param('asset') asset: string,
-  // ): Promise<ExchangeRateResponse> {
-  //   return this.portfolioService.fetchExchangeRate(asset);
-  // }
-  // @Get('/test')
-  // getHistoricalPrices(@Query('asset') asset: string) {
-  //   return this.portfolioService.getHistoricalData(asset);
-  // }
+  @Get('/exchange-rate/:asset')
+  //fetch exchange rates from external API
+  async getExchangeRate(@Param('asset') asset: string): Promise<number> {
+    return this.portfolioService.fetchExchangeRate(asset);
+  }
 
   @Get('/data')
   //send full portfolio object with necessary data

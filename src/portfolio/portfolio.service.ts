@@ -45,19 +45,25 @@ export class PortfolioService {
     @Inject('CACHE_MANAGER') private cacheManager: Cache,
   ) {}
 
-  // async fetchExchangeRate(asset: string): Promise<ExchangeRateResponse> {
-  //   //composing external api url
-  //   const url: string = `${this.env.get<string>('COINAPI_URL')}/exchangerate/${asset}/USDT`;
-  //   const headers = {
-  //     'X-CoinAPI-Key': this.env.get<string>('COINAPI_KEY'),
-  //   };
-  //   try {
-  //     const response = await lastValueFrom(this.http.get(url, { headers }));
-  //     return response.data;
-  //   } catch (error) {
-  //     throw new Error(`Failed to fetch exchange rate: ${error.message}`);
-  //   }
-  // }
+  async fetchExchangeRate(asset: string): Promise<number> {
+    //composing external api url
+    const url: string = `${this.env.get<string>('COINMARKETCAP_BASE_URL')}/cryptocurrency/quotes/latest`;
+    const headers = {
+      'X-CMC_PRO_API_KEY': this.env.get<string>('COINMARKETCAP_API_KEY'),
+    };
+    const params = {
+      symbol: asset.toUpperCase(),
+      convert: 'USD',
+    };
+    try {
+      const response = await lastValueFrom(
+        this.http.get(url, { headers, params }),
+      );
+      return response.data.data[asset].quote.USD.price;
+    } catch (error) {
+      throw new Error(`Failed to fetch exchange rate: ${error.message}`);
+    }
+  }
 
   // async addAsset(portfolioAssetDto: PortfolioAssetDto): Promise<void> {
   //   return this.portfolioRepository.addAsset(portfolioAssetDto);

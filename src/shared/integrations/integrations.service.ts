@@ -254,10 +254,9 @@ export class IntegrationsService {
           }
         }),
       );
-
+      //Filter out any failed results (null values)
       const filteredResults = results.filter((result) => result !== null);
 
-      //Filter out any failed results (null values)
       return {
         data: filteredResults,
         total,

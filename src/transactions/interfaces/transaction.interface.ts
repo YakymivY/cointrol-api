@@ -1,4 +1,5 @@
 import { TransactionType } from 'src/shared/enums/transaction-type.enum';
+import { Storage } from './storage.interface';
 
 export interface TransactionInterface {
   id: string;
@@ -8,5 +9,5 @@ export interface TransactionInterface {
   price: number;
   amount: number;
   total: number;
-  storage?: string;
+  storage?: Storage;
 }

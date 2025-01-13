@@ -387,7 +387,12 @@ export class TransactionsService {
           price: tx.price,
           amount: tx.amount,
           total: tx.amount * tx.price,
-          ...(tx.storage?.name && { storage: tx.storage.name }),
+          ...(tx.storage?.name && {
+            storage: {
+              name: tx.storage.name,
+              url: tx.storage.link,
+            },
+          }),
         };
         transactionsResponse.push(outputTx);
       }

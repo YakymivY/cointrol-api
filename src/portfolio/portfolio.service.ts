@@ -28,6 +28,7 @@ import { FixedPnlRepository } from './repositories/fixed-pnl.repository';
 import { FixedPnl } from './interfaces/fixed-pnl.interface';
 import { DepositResponse } from './interfaces/deposit-response.interface';
 import { WithdrawResponse } from './interfaces/withgraw-response.interface';
+import { HistoryRepository } from './repositories/history.repository';
 
 @Injectable()
 export class PortfolioService {
@@ -44,6 +45,8 @@ export class PortfolioService {
     private readonly usersRepository: UsersRepository,
     @InjectRepository(FixedPnlRepository)
     private readonly fixedPnlRepository: FixedPnlRepository,
+    @InjectRepository(HistoryRepository)
+    private readonly historyRepository: HistoryRepository,
     @Inject('CACHE_MANAGER') private cacheManager: Cache,
   ) {}
 
@@ -113,8 +116,8 @@ export class PortfolioService {
         //portfolio stats incrementation
         portfolioData.portfolioValue += total;
         portfolioData.currentPnl.value += pnl;
-        portfolioData.fixedPnl += item.allTimePnl;
-        portfolioData.totalPnl += totalPnl;
+        // portfolioData.fixedPnl += item.allTimePnl;
+        //portfolioData.totalPnl += totalPnl;
         portfolioData.invested += totalSpent;
 
         //update best & worst performers
@@ -157,6 +160,11 @@ export class PortfolioService {
     portfolioData.currentPnl.change =
       (portfolioData.currentPnl.value / portfolioData.invested) * 100;
 
+    //add fixed pnl and total pnl
+    portfolioData.fixedPnl = await this.calculatePortfolioFixedPnl(userId);
+    portfolioData.totalPnl =
+      parseFloat(portfolioData.fixedPnl.toString()) +
+      parseFloat(portfolioData.currentPnl.value.toString());
     return portfolioData;
   }
 
@@ -422,5 +430,15 @@ export class PortfolioService {
       where: { userId },
     });
     return fixedPlnRecords;
+  }
+
+  private async calculatePortfolioFixedPnl(userId: string): Promise<number> {
+    const totalFixedPnl = await this.historyRepository
+      .createQueryBuilder('history')
+      .select('SUM(history.allTimePnl)', 'totalPnl')
+      .where('history.userId = :userId', { userId })
+      .getRawOne();
+
+    return totalFixedPnl.totalPnl;
   }
 }

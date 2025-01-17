@@ -17,6 +17,8 @@ import { BalanceResponse } from './interfaces/balance-response.interface';
 import { WebsocketService } from 'src/shared/websocket/websocket.service';
 import { OwnedAsset } from './interfaces/owned-assets.interface';
 import { FixedPnl } from './interfaces/fixed-pnl.interface';
+import { DepositResponse } from './interfaces/deposit-response.interface';
+import { WithdrawResponse } from './interfaces/withgraw-response.interface';
 
 @Controller('portfolio')
 @UseGuards(AuthGuard())
@@ -50,7 +52,7 @@ export class PortfolioController {
   depositFunds(
     @GetUser() user: User,
     @Body() depositDto: FundsOperationDto,
-  ): Promise<void> {
+  ): Promise<DepositResponse> {
     return this.portfolioService.depositFunds(depositDto, user.id);
   }
 
@@ -59,7 +61,7 @@ export class PortfolioController {
   withdrawFunds(
     @GetUser() user: User,
     @Body() withdrawDto: FundsOperationDto,
-  ): Promise<void> {
+  ): Promise<WithdrawResponse> {
     return this.portfolioService.withdrawFunds(withdrawDto, user.id);
   }
 

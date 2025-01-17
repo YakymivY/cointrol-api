@@ -31,7 +31,7 @@ export class WebsocketService implements OnModuleInit, OnModuleDestroy {
     const externalWebSocketUrl = this.env.get<string>('COINAPI_WS_URL');
     this.ws = new WebSocket(externalWebSocketUrl, {
       headers: {
-        'X-CoinAPI-Key': this.env.get<string>('COINAPI_KEY'),
+        'X-CoinAPI-Key': this.env.get<string>('COINAPI_KEY_2'),
       },
     });
 

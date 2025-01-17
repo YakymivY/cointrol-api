@@ -32,7 +32,7 @@ export class IntegrationsService {
     try {
       //fetch data from external API
       const headers = {
-        'X-CoinAPI-Key': this.env.get<string>('COINAPI_KEY'),
+        'X-CoinAPI-Key': this.env.get<string>('COINAPI_KEY_2'),
       };
       const response = await firstValueFrom(
         this.http.get(this.apiUrl, { headers }),

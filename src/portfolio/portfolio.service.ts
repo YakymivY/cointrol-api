@@ -26,6 +26,8 @@ import { HistoricalData } from './interfaces/historical-data.interface';
 import { OwnedAsset } from './interfaces/owned-assets.interface';
 import { FixedPnlRepository } from './repositories/fixed-pnl.repository';
 import { FixedPnl } from './interfaces/fixed-pnl.interface';
+import { DepositResponse } from './interfaces/deposit-response.interface';
+import { WithdrawResponse } from './interfaces/withgraw-response.interface';
 
 @Injectable()
 export class PortfolioService {
@@ -277,7 +279,7 @@ export class PortfolioService {
     //create url, params and headers
     const url: string = `${this.env.get<string>('COINAPI_URL')}/exchangerate/${asset}/USDT/history`;
     const headers = {
-      'X-CoinAPI-Key': this.env.get<string>('COINAPI_KEY'),
+      'X-CoinAPI-Key': this.env.get<string>('COINAPI_KEY_2'),
     };
     const params = {
       period_id: '5SEC',
@@ -309,7 +311,7 @@ export class PortfolioService {
   async depositFunds(
     depositDto: FundsOperationDto,
     userId: string,
-  ): Promise<void> {
+  ): Promise<DepositResponse> {
     const { amount } = depositDto;
 
     //fetch user
@@ -338,6 +340,7 @@ export class PortfolioService {
     //save to the database
     try {
       await this.balanceRepository.saveBalance(balance);
+      return { deposit: balance.deposit, balance: balance.balance };
     } catch (error) {
       this.logger.error(`Erorr updating the balance: ${error}`);
       throw new InternalServerErrorException('Failed to update the balance.');
@@ -347,7 +350,7 @@ export class PortfolioService {
   async withdrawFunds(
     withdrawDto: FundsOperationDto,
     userId: string,
-  ): Promise<void> {
+  ): Promise<WithdrawResponse> {
     const { amount } = withdrawDto;
 
     //fetch user
@@ -372,6 +375,7 @@ export class PortfolioService {
     //save to the database
     try {
       await this.balanceRepository.saveBalance(balance);
+      return { withdraw: balance.withdraw, balance: balance.balance };
     } catch (error) {
       this.logger.error(`Erorr updating the balance: ${error}`);
       throw new InternalServerErrorException('Failed to update the balance.');

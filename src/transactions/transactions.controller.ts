@@ -5,6 +5,7 @@ import { User } from 'src/auth/entities/user.entity';
 import { AddTransactionDto } from './dto/add-transaction.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { TransactionOutput } from './interfaces/transaction-output.interface';
+import { TransactionResponse } from './interfaces/transactino-response.interface';
 
 @Controller('transactions')
 @UseGuards(AuthGuard())
@@ -16,7 +17,7 @@ export class TransactionsController {
   async addTransaction(
     @GetUser() user: User,
     @Body() addTransactionDto: AddTransactionDto,
-  ): Promise<void> {
+  ): Promise<TransactionResponse> {
     return this.transactionsService.addTransaction(addTransactionDto, user);
   }
 

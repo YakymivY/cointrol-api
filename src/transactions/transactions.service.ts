@@ -1,7 +1,7 @@
-import { HistoryRepository } from './../portfolio/repositories/history.repository';
 import { PortfolioRepository } from './../portfolio/repositories/portfolio.repository';
 import {
   BadRequestException,
+  Inject,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -20,9 +20,11 @@ import { Storage } from './entities/storage.entity';
 import { History } from 'src/portfolio/entities/history.entity';
 import { DataSource, ILike, QueryRunner } from 'typeorm';
 import { TransactionOutput } from './interfaces/transaction-output.interface';
-import { FixedPnlRepository } from 'src/portfolio/repositories/fixed-pnl.repository';
 import { Portfolio } from 'src/portfolio/entities/portfolio.entity';
 import { FixedPnl } from 'src/portfolio/entities/fixed-pnl.entity';
+import { TransactionResponse } from './interfaces/transactino-response.interface';
+import { Transaction } from './entities/transaction.entity';
+import { Cache } from '@nestjs/cache-manager';
 
 @Injectable()
 export class TransactionsService {
@@ -36,17 +38,14 @@ export class TransactionsService {
     private balanceRepository: BalanceRepository,
     @InjectRepository(StorageRepository)
     private storageRepository: StorageRepository,
-    @InjectRepository(HistoryRepository)
-    private historyRepository: HistoryRepository,
-    @InjectRepository(FixedPnlRepository)
-    private fixedPnlRepository: FixedPnlRepository,
     private readonly dataSource: DataSource,
+    @Inject('CACHE_MANAGER') private cacheManager: Cache,
   ) {}
 
   async addTransaction(
     addTransactionDto: AddTransactionDto,
     user: User,
-  ): Promise<void> {
+  ): Promise<TransactionResponse> {
     const { asset, amount, price, storage } = addTransactionDto;
     const total: number = amount * price;
 
@@ -86,15 +85,15 @@ export class TransactionsService {
       }
 
       //save tx in database
-      await queryRunner.manager.save(
-        this.transactionRepository.createTransactionEntity(
-          asset,
-          amount,
-          price,
-          user,
-          storageObject,
-        ),
+      const tx = this.transactionRepository.createTransactionEntity(
+        asset,
+        amount,
+        price,
+        user,
+        storageObject,
       );
+      const savedTx: Transaction = await queryRunner.manager.save(tx);
+      const savedTxOutput = this.modifyTransactionsArray([savedTx]);
 
       //update user portfolio data after transaction
       await this.updatePortfolio(
@@ -105,15 +104,31 @@ export class TransactionsService {
         price,
         storageObject,
       );
+      //delete cached assets data for user to update
+      this.cacheManager.del(`portfolio:${user.id}`);
       this.logger.log(`Portfolio updated successfully for user ${user.id}.`);
 
       //update balance of user
-      await this.updateBalance(queryRunner, user.id, total);
+      const updatedBalance = await this.updateBalance(
+        queryRunner,
+        user.id,
+        total,
+      );
       this.logger.log(`Balance updated successfully for user ${user.id}`);
 
       //commit the transaction
       await queryRunner.commitTransaction();
       this.logger.log(`Transaction completed successfully for user ${user.id}`);
+
+      return {
+        transaction: savedTxOutput[0],
+        balance: {
+          userId: updatedBalance.user.id,
+          deposit: updatedBalance.deposit,
+          withdraw: updatedBalance.withdraw,
+          balance: updatedBalance.balance,
+        },
+      };
     } catch (error) {
       //rollback the transaction in case of failure
       await queryRunner.rollbackTransaction();
@@ -144,7 +159,7 @@ export class TransactionsService {
     amount: number,
     price: number,
     storage: Storage | null,
-  ): Promise<void> {
+  ): Promise<Portfolio> {
     try {
       //get the asset used in the transaction
       const portfolioAsset = await queryRunner.manager.findOne(Portfolio, {
@@ -156,7 +171,7 @@ export class TransactionsService {
       if (!portfolioAsset) {
         //create new history record and a new asset record for the user
         const history = queryRunner.manager.create(History, { userId, asset });
-        const portfolio = queryRunner.manager.create(Portfolio, {
+        const portfolio: Portfolio = queryRunner.manager.create(Portfolio, {
           userId,
           asset,
           amount,
@@ -165,6 +180,7 @@ export class TransactionsService {
         });
         await queryRunner.manager.save(history);
         await queryRunner.manager.save(portfolio);
+        return portfolio;
       } else {
         if (amount > 0) {
           //user is buying
@@ -232,6 +248,7 @@ export class TransactionsService {
 
         //save updated asset info
         await queryRunner.manager.save(Portfolio, portfolioAsset);
+        return portfolioAsset;
       }
     } catch (error) {
       this.logger.error(
@@ -322,7 +339,7 @@ export class TransactionsService {
     queryRunner: QueryRunner,
     userId: string,
     balanceChange: number,
-  ): Promise<void> {
+  ): Promise<Balance> {
     try {
       const userBalance = await queryRunner.manager.findOne(Balance, {
         where: { user: { id: userId } },
@@ -336,7 +353,7 @@ export class TransactionsService {
       //update the balance
       userBalance.balance = userBalance.balance - balanceChange;
 
-      await queryRunner.manager.save(Balance, userBalance);
+      return await queryRunner.manager.save(Balance, userBalance);
     } catch (error) {
       this.logger.error(
         `Failed to update balance for user ${userId}. Error: ${error.message}`,
@@ -359,9 +376,6 @@ export class TransactionsService {
     page = Math.max(page, 1);
     limit = Math.max(limit, 1);
 
-    //creating initial array of txs
-    const transactionsResponse: TransactionInterface[] = [];
-
     try {
       //calc offset
       const offset: number = (page - 1) * limit;
@@ -378,27 +392,10 @@ export class TransactionsService {
         });
 
       //modify and add some fields
-      for (const tx of transactions) {
-        const outputTx: TransactionInterface = {
-          id: tx.id,
-          type: tx.amount < 0 ? TransactionType.SELL : TransactionType.BUY,
-          timestamp: tx.timestamp.toISOString(),
-          asset: tx.asset,
-          price: tx.price,
-          amount: tx.amount,
-          total: tx.amount * tx.price,
-          ...(tx.storage?.name && {
-            storage: {
-              name: tx.storage.name,
-              url: tx.storage.link,
-            },
-          }),
-        };
-        transactionsResponse.push(outputTx);
-      }
+      const output = this.modifyTransactionsArray(transactions);
 
       const totalPages = Math.ceil(total / limit);
-      return { data: transactionsResponse, total, page, totalPages };
+      return { data: output, total, page, totalPages };
     } catch (error) {
       this.logger.error(
         `Error getting transactions for user ${userId}: ${error.message}`,
@@ -443,5 +440,34 @@ export class TransactionsService {
       this.logger.error('Error fetching portfolio asset:', error);
       throw new Error('Could not verify asset avaliability.');
     }
+  }
+
+  private modifyTransactionsArray(
+    transactions: Transaction[],
+  ): TransactionInterface[] {
+    //creating initial array of txs
+    const transactionsResponse: TransactionInterface[] = [];
+
+    //modify array
+    for (const tx of transactions) {
+      const outputTx: TransactionInterface = {
+        id: tx.id,
+        type: tx.amount < 0 ? TransactionType.SELL : TransactionType.BUY,
+        timestamp: tx.timestamp.toISOString(),
+        asset: tx.asset,
+        price: tx.price,
+        amount: tx.amount,
+        total: tx.amount * tx.price,
+        ...(tx.storage?.name && {
+          storage: {
+            name: tx.storage.name,
+            url: tx.storage.link,
+          },
+        }),
+      };
+      transactionsResponse.push(outputTx);
+    }
+
+    return transactionsResponse;
   }
 }

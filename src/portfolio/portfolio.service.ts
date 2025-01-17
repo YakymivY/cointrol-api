@@ -161,7 +161,8 @@ export class PortfolioService {
       (portfolioData.currentPnl.value / portfolioData.invested) * 100;
 
     //add fixed pnl and total pnl
-    portfolioData.fixedPnl = await this.calculatePortfolioFixedPnl(userId);
+    portfolioData.fixedPnl =
+      (await this.calculatePortfolioFixedPnl(userId)) || 0;
     portfolioData.totalPnl =
       parseFloat(portfolioData.fixedPnl.toString()) +
       parseFloat(portfolioData.currentPnl.value.toString());
@@ -393,7 +394,21 @@ export class PortfolioService {
   async getUserBalance(userId: string): Promise<BalanceResponse | null> {
     try {
       //fetch data from db
-      const balance = await this.balanceRepository.findBalanceOfUser(userId);
+      let balance = await this.balanceRepository.findBalanceOfUser(userId);
+
+      if (!balance) {
+        const user = await this.usersRepository.findOne({
+          where: { id: userId },
+        });
+        const newBalance = this.balanceRepository.create({
+          user,
+          balance: 0,
+          deposit: 0,
+          withdraw: 0,
+        });
+        await this.balanceRepository.save(newBalance);
+        balance = newBalance;
+      }
       //form response object
       return {
         userId: balance.user.id,

@@ -101,6 +101,9 @@ export class WsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     //send portfolio data every 5 seconds
     if (!this.subscribedClients.has(userId)) {
+      //clear portfolio cache if there is one
+      this.cacheManager.del(`portfolio:${userId}`);
+
       //just to start from execution not interval
       this.sendPortfolioData(userId);
 

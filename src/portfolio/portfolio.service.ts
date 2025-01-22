@@ -108,16 +108,21 @@ export class PortfolioService {
         const pnl: number = total - totalSpent;
         const pnlPercent: number = (pnl / totalSpent) * 100;
         const totalPnl: number = pnl + item.allTimePnl;
-        const historicalData: HistoricalData = await this.getHistoricalData(
-          item.asset,
-          price,
-        );
+
+        //placeholder value for historicalData
+        const historicalData: HistoricalData =
+          (await this.getHistoricalDataFromCache(item.asset)) || {};
+
+        //start async fetching process
+        this.getHistoricalData(item.asset, price).catch((error) => {
+          this.logger.error(
+            `Failed to fetch historical data for ${item.asset}: ${error.message}`,
+          );
+        });
 
         //portfolio stats incrementation
         portfolioData.portfolioValue += total;
         portfolioData.currentPnl.value += pnl;
-        // portfolioData.fixedPnl += item.allTimePnl;
-        //portfolioData.totalPnl += totalPnl;
         portfolioData.invested += totalSpent;
 
         //update best & worst performers
@@ -214,7 +219,7 @@ export class PortfolioService {
       price = await this.cacheManager.get(`exchangeRates:${item.asset}`);
       if (price == null) {
         retries++;
-        await new Promise((resolve) => setTimeout(resolve, retryDelay)); // Add delay between attempts
+        await new Promise((resolve) => setTimeout(resolve, retryDelay)); //add delay between attempts
       }
     } while (price == null && retries < maxRetries);
 
@@ -227,6 +232,14 @@ export class PortfolioService {
     return price;
   }
 
+  async getHistoricalDataFromCache(asset: string): Promise<HistoricalData> {
+    const cacheKey: string = `historicalPrices:${asset}`;
+    const historicalData: HistoricalData =
+      await this.cacheManager.get<HistoricalData>(cacheKey);
+
+    return historicalData;
+  }
+
   async getHistoricalData(
     asset: string,
     currentPrice: number,
@@ -236,7 +249,6 @@ export class PortfolioService {
     //check if the data is in cache
     let historicalDataChange: HistoricalData =
       await this.cacheManager.get<HistoricalData>(cacheKey);
-    //const historicalDataChange: HistoricalData = {};
 
     if (!historicalDataChange) {
       historicalDataChange = {};
